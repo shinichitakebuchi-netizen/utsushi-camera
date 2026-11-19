@@ -199,7 +199,7 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
 <body>
 <div id="app">
   <header>
-    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v14</small></div>
+    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v14.1</small></div>
     <div class="hbtns">
       <button class="pill tg" id="autoBtn">AUTO</button>
       <button class="pill tg" id="meterBtn">METER</button>
@@ -377,6 +377,9 @@ class Renderer{
   constructor(canvas,keep){
     const gl=canvas.getContext("webgl",{preserveDrawingBuffer:!!keep,antialias:false,premultipliedAlpha:false});
     if(!gl) throw new Error("WebGL非対応");
+    // GPUがリセットされて描画が失われたら、復帰を待って自動で読み込み直す
+    canvas.addEventListener("webglcontextlost",e=>{e.preventDefault();lostGL();},false);
+    canvas.addEventListener("webglcontextrestored",()=>location.reload(),false);
     this.gl=gl;this.c=canvas;
     const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;};
     const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
@@ -426,7 +429,16 @@ const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({auto:S.aut
 
 let R,EX;
 try{R=new Renderer(view,false);EX=new Renderer(document.createElement("canvas"),true);}
-catch(e){msg.textContent="この端末ではWebGLが使えません："+e.message;}
+catch(e){
+  // 少し前まで使えていた端末でも、Chrome側でGPUが一時的に止められると使えなくなることがある
+  msg.innerHTML=`画面の描画（WebGL）が使えない状態です<br><small>${e.message}</small><br><br>アプリ／Chromeを完全に終了して開き直してね。<br>直らなければスマホを再起動してみてね。<br><button id="glretry">もう一度読み込む</button>`;
+  $("glretry").onclick=()=>location.reload();
+}
+function lostGL(){
+  stopCamera();msg.style.display="flex";
+  msg.innerHTML=`描画が一時的に止まりました（GPUのリセット）<br>復帰を待っています…<br><button id="glretry2">今すぐ読み込み直す</button>`;
+  $("glretry2").onclick=()=>location.reload();
+}
 
 // 粒子と周辺減光（FILMボタンでON/OFF）
 function film(a){
