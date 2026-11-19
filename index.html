@@ -7,6 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>写 UTSUSHI</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-title" content="写">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <style>
 :root{--acc:#ff7a1a;--fg:#f2f0eb;--dim:#8a8780;--line:#2e2e2e}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -259,11 +264,13 @@ function setupZoom(){
 function timeout(p,ms){return Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),ms))]);}
 
 async function processImage(src,sw,sh,mirror){
+  // ImageBitmapはWebGLの上下反転指定が効かないので、必ずcanvasに描き直す
   // テクスチャ上限を超える場合は縮小
   let s=src;
   const lim=Math.min(EX.maxTex,8192);
-  if(Math.max(sw,sh)>lim){
-    const k=lim/Math.max(sw,sh);const c=document.createElement("canvas");
+  const isBmp=typeof ImageBitmap!=="undefined"&&src instanceof ImageBitmap;
+  if(isBmp||Math.max(sw,sh)>lim){
+    const k=Math.min(1,lim/Math.max(sw,sh));const c=document.createElement("canvas");
     c.width=Math.round(sw*k);c.height=Math.round(sh*k);c.getContext("2d").drawImage(src,0,0,c.width,c.height);
     s=c;sw=c.width;sh=c.height;
   }
@@ -311,7 +318,7 @@ async function capture(){
         if((bmp.width>bmp.height)===(sw>sh)&&bmp.width*bmp.height>sw*sh){src=bmp;sw=bmp.width;sh=bmp.height;}
       }catch(e){}
     }
-    const out=await processImage(src,sw,sh,false);
+    const out=await processImage(src,sw,sh,S.facing==="user");
     addShot(out);
     toast("撮影しました");
   }catch(e){toast("撮影に失敗："+e.message);}
@@ -379,6 +386,7 @@ window.addEventListener("resize",()=>setTimeout(layout,100));
 video.addEventListener("loadedmetadata",layout);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)stopCamera();else startCamera();});
 
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 renderLooks();renderToggles();
 if(R){startCamera();requestAnimationFrame(loop);}
 </script>
