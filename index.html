@@ -65,6 +65,29 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 .ehint{text-align:center;font-size:10px;color:var(--dim);padding:6px 0 0;letter-spacing:.04em}
 #etip{padding:0 18px 4px;font-size:11px;color:var(--dim);min-height:16px}
 .eopts{display:flex;gap:6px;justify-content:center;padding:6px 0 14px}
+#thumb,#flip,#shutter{transition:transform .3s}
+body[data-rot="90"] #thumb,body[data-rot="90"] #flip{transform:rotate(90deg)}
+body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
+@media (orientation:landscape) and (min-aspect-ratio:5/4){
+  #app{display:grid;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto 1fr;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  header{grid-column:2;grid-row:1;flex-direction:column;align-items:stretch;padding:8px 10px 4px}
+  .hbtns{justify-content:flex-start}
+  #stage{grid-column:1;grid-row:1/7}
+  .looks{grid-column:2;grid-row:2;padding:8px 10px 4px}
+  #tip{grid-column:2;grid-row:3;padding:0 12px 4px}
+  .row{grid-column:2;grid-row:4;padding:2px 12px}
+  .controls{grid-column:2;grid-row:5;padding:8px 18px}
+  #editor{display:none;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto auto 1fr}
+  #editor.on{display:grid}
+  #editor .ebar{grid-column:2;grid-row:1}
+  #editor .ewrap{grid-column:1;grid-row:1/8}
+  #editor .ehint{grid-column:2;grid-row:2}
+  #elooks{grid-column:2;grid-row:3}
+  #etip{grid-column:2;grid-row:4}
+  #editor .row{grid-column:2;grid-row:5}
+  #editor .eopts{grid-column:2;grid-row:6;flex-wrap:wrap}
+}
 #viewer{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 #viewer.on{display:flex}
 #viewer .imgwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:10px}
@@ -79,7 +102,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <body>
 <div id="app">
   <header>
-    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v9</small></div>
+    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v10</small></div>
     <div class="hbtns">
       <button class="pill" id="autoBtn">AUTO</button>
       <button class="pill" id="aspectBtn">3:2</button>
@@ -413,7 +436,7 @@ function setupZoom(){
 // ===== Process / capture =====
 function timeout(p,ms){return Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),ms))]);}
 
-async function processImage(src,sw,sh,mirror,auto,mpMax){
+async function processImage(src,sw,sh,mirror,auto,mpMax,rot){
   // ImageBitmapはWebGLの上下反転指定が効かないので、必ずcanvasに描き直す
   // テクスチャ上限を超える場合は縮小
   let s=src;
@@ -452,7 +475,12 @@ async function processImage(src,sw,sh,mirror,auto,mpMax){
     }
   }
   let out=full;
-  if(S.frame) out=addFrame(full,L.name);
+  if(rot){ // 90°回転（横持ち撮影）
+    const r=document.createElement("canvas");r.width=OH;r.height=OW;const rx=r.getContext("2d");
+    rx.translate(OH/2,OW/2);rx.rotate(rot*Math.PI/180);rx.drawImage(full,-OW/2,-OH/2);
+    out=r;full.width=1;
+  }
+  if(S.frame) out=addFrame(out,L.name);
   const blob=await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
   blob.w=out.width;blob.h=out.height;
   return blob;
@@ -496,7 +524,7 @@ async function capture(){
         if((bmp.width>bmp.height)===(sw>sh)&&bmp.width*bmp.height>sw*sh){src=bmp;sw=bmp.width;sh=bmp.height;}
       }catch(e){}
     }
-    const out=await processImage(src,sw,sh,S.facing==="user",AUTO.ready?{wb:AUTO.wb.slice(),exp:AUTO.exp}:null);
+    const out=await processImage(src,sw,sh,S.facing==="user",AUTO.ready?{wb:AUTO.wb.slice(),exp:AUTO.exp}:null,null,devRot);
     addShot(out);
     toast("撮影しました");
   }catch(e){toast("撮影に失敗："+e.message);}
@@ -688,27 +716,45 @@ $("thumb").onclick=()=>openViewer(S.shots.length-1);
 $("flip").onclick=()=>{S.facing=S.facing==="environment"?"user":"environment";persist();startCamera();};
 document.addEventListener("keydown",e=>{if((e.key===" "||e.key==="AudioVolumeUp"||e.key==="AudioVolumeDown")&&!$("viewer").classList.contains("on")){e.preventDefault();capture();}});
 window.addEventListener("resize",()=>setTimeout(layout,100));
-video.addEventListener("loadedmetadata",layout);
+video.addEventListener("loadedmetadata",layout);video.addEventListener("resize",()=>setTimeout(layout,50));
 document.addEventListener("visibilitychange",()=>{if(document.hidden)stopCamera();else if(!$("editor").classList.contains("on"))startCamera();});
 
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
 // ===== 水平器（グリッドON時に表示。水平になるとオレンジ） =====
 let levelOn=false,levelStarted=false;
-async function startLevel(){
-  if(levelStarted)return;levelStarted=true;
-  try{if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){const r=await DeviceMotionEvent.requestPermission();if(r!=="granted")return;}}catch(e){return;}
-  window.addEventListener("devicemotion",e=>{
-    const g=e.accelerationIncludingGravity;if(!g||g.x==null)return;
-    if(Math.abs(g.z)>8.5){levelOn=false;$("level").style.display="none";return;} // 上や下に向けている時は非表示
-    const ang=(screen.orientation&&screen.orientation.angle)||window.orientation||0;
-    let a=Math.atan2(g.x,g.y)*180/Math.PI;           // 縦持ち基準
-    a=((a+ang+540)%360)-180;                          // 画面の向きを補正
-    let t=a; if(t>90)t-=180; if(t<-90)t+=180;         // 上下どちら向きでも水平基準
-    levelOn=true;const el=$("level");el.style.display=S.grid?"block":"none";
-    el.style.transform=`translate(-50%,-50%) rotate(${-t}deg)`;el.classList.toggle("ok",Math.abs(t)<1.2);
-  });
+// 本体の向き（画面が縦のまま本体だけ横にした時に、保存写真を回転させる）
+let devRot=0;
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function onMotion(e){
+  const g0=e.accelerationIncludingGravity;if(!g0||g0.x==null)return;
+  const sg=isIOS?-1:1,gx=g0.x*sg,gy=g0.y*sg,gz=g0.z*sg;
+  const ang=(screen.orientation&&screen.orientation.angle)||window.orientation||0;
+  // 本体の向き判定（画面が回転していない時だけ）
+  let nr=devRot;
+  if(Math.abs(gz)<8.5){
+    if(Math.abs(gx)>Math.abs(gy)*1.4&&Math.abs(gx)>4) nr=gx>0?-90:90;
+    else if(Math.abs(gy)>Math.abs(gx)*1.4) nr=0;
+  }
+  if(ang!==0) nr=0;
+  if(nr!==devRot){devRot=nr;document.body.dataset.rot=devRot;}
+  // 水平器
+  if(Math.abs(gz)>8.5){levelOn=false;$("level").style.display="none";return;}
+  let a=Math.atan2(gx,gy)*180/Math.PI;
+  a=((a+ang+540)%360)-180;
+  const base=Math.round(a/90)*90, dev=a-base;
+  levelOn=true;const el=$("level");el.style.display=S.grid?"block":"none";
+  el.style.transform=`translate(-50%,-50%) rotate(${-a}deg)`;el.classList.toggle("ok",Math.abs(dev)<1.2);
 }
-if(S.grid)startLevel();
+let motionOn=false;
+async function startMotion(){
+  if(motionOn)return;
+  try{if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){const r=await DeviceMotionEvent.requestPermission();if(r!=="granted")return;}}catch(e){return;}
+  motionOn=true;window.addEventListener("devicemotion",onMotion);
+}
+async function startLevel(){return startMotion();}
+// Androidは許可不要なので最初から開始。iPhone/iPadは最初のタップで許可を求める
+if(!(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission))startMotion();
+else document.addEventListener("pointerup",()=>startMotion(),{once:true});
 renderLooks();renderToggles();
 if(R){startCamera();requestAnimationFrame(loop);}
 </script>
