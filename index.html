@@ -66,7 +66,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <body>
 <div id="app">
   <header>
-    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v6</small></div>
+    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v7</small></div>
     <div class="hbtns">
       <button class="pill" id="autoBtn">AUTO</button>
       <button class="pill" id="aspectBtn">3:2</button>
@@ -292,7 +292,7 @@ function updateAuto(){
 function autoParams(a){
   const up=Math.max(0,(S.auto?a.exp:0)+S.ev);          // どれだけ明るく持ち上げたか
   const clar=(S.auto?.3:.2)*Math.max(.25,1-.5*up);      // 暗い場面ほど立体感は控えめ
-  const nr=Math.min(.85,.25+.4*up);                      // 暗い場面ほどノイズ低減を強く
+  const nr=Math.min(.9,.35+.45*up);                      // 暗い場面ほどノイズ低減を強く
   return S.auto?{wb:a.wb,exp:a.exp+S.ev,clar,nr}:{wb:[1,1,1],exp:S.ev,clar,nr};
 }
 // LUT画像を読み込み
@@ -388,7 +388,8 @@ async function processImage(src,sw,sh,mirror,auto){
   EX.upload(s);
   const a=auto||analyze(s,sw,sh);
   const L=LOOKS[S.look],A=autoParams(a),F=film(S.auto?a:null);
-  EX.draw({crop,look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[1/sw,1/sh],grain:F.grain,vig:F.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
+  const nrk=Math.max(1,Math.max(sw,sh)/1600);
+  EX.draw({crop,look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[nrk/sw,nrk/sh],grain:F.grain,vig:F.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
   let out=EX.c;
   if(S.frame) out=addFrame(EX.c,L.name);
   const blob=await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
