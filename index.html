@@ -193,13 +193,13 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
 #viewer .bar button{background:linear-gradient(#1b1b1b,#121212);color:var(--fg);border:1px solid #272727;border-radius:10px;padding:10px 16px;font-size:12px}
 #viewer .bar button.pri{background:var(--acc);color:#000;border-color:var(--acc);font-weight:600}
 #vinfo{text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.08em}
-#toast{position:fixed;left:50%;bottom:140px;transform:translateX(-50%);background:rgba(28,28,28,.92);border:1px solid #2c2c2c;color:var(--fg);padding:8px 16px;border-radius:10px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+#toast{position:fixed;left:50%;bottom:140px;transform:translateX(-50%);max-width:88vw;text-align:center;line-height:1.5;background:rgba(28,28,28,.92);border:1px solid #2c2c2c;color:var(--fg);padding:8px 16px;border-radius:10px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v14.1</small></div>
+    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v14.2</small></div>
     <div class="hbtns">
       <button class="pill tg" id="autoBtn">AUTO</button>
       <button class="pill tg" id="meterBtn">METER</button>
@@ -624,6 +624,8 @@ async function startCamera(){
     video.srcObject=st;await video.play();
     msg.style.display="none";
     setupZoom();setupFocus();
+    // Android Chromeは能力情報が遅れて揃うことがあるので、少し待って取り直す
+    [800,2500].forEach(t=>setTimeout(()=>{if(S.track&&S.track===st.getVideoTracks()[0]){const n=FOC.av.length;setupFocus();if(FOC.av.length!==n)toast("ピント："+FOC.av.join(" / ")+" が使えます");}},t));
     setTimeout(layout,50);
   }catch(e){
     msg.innerHTML=`カメラを開けませんでした（${e.name||e.message}）<br>ブラウザの設定でカメラを許可してね。<br><button id="retry">もう一度</button>`;
@@ -657,6 +659,7 @@ function setupFocus(){
   const caps=S.track&&S.track.getCapabilities?S.track.getCapabilities():{};
   const sup=navigator.mediaDevices.getSupportedConstraints?navigator.mediaDevices.getSupportedConstraints():{};
   const modes=caps.focusMode||[];
+  FOC.raw={modes,dist:caps.focusDistance||null,poi:!!sup.pointsOfInterest};
   FOC.dist=caps.focusDistance&&caps.focusDistance.max>caps.focusDistance.min?caps.focusDistance:null;
   FOC.poi=!!sup.pointsOfInterest;
   FOC.av=[];
@@ -961,7 +964,7 @@ $("esave").onclick=async()=>{
 window.addEventListener("resize",()=>{if($("editor").classList.contains("on"))setTimeout(()=>{edLayout();edRender();},120);});
 
 // ===== UI =====
-function toast(t){const e=$("toast");e.textContent=t;e.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.opacity=0,1600);}
+function toast(t,ms){const e=$("toast");e.textContent=t;e.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.opacity=0,ms||1600);}
 function renderLooks(){
   const box=$("looks");box.innerHTML="";
   LOOKS.forEach((l,i)=>{const b=document.createElement("button");b.className="chip"+(i===S.look?" on":"");b.textContent=l.name;
@@ -1019,7 +1022,7 @@ function renderToggles(){
   $("filmBtn").classList.toggle("on",S.film);
   $("meterBtn").classList.toggle("on",S.meter);$("meter").classList.toggle("on",S.meter);
   evRuler.sync();renderVfbar();
-  const ab=$("afBtn");ab.style.display=FOC.av.length?"":"none";ab.textContent=S.af||"AF";
+  const ab=$("afBtn");ab.style.display=S.track?"":"none";ab.textContent=S.af||"AF";
   $("mfrow").classList.toggle("on",S.af==="MF");if(S.af==="MF")mfRuler.sync();
 }
 $("aspectBtn").onclick=()=>{S.aspect=(S.aspect+1)%ASPECTS.length;persist();renderToggles();layout();};
@@ -1029,7 +1032,11 @@ $("autoBtn").onclick=()=>{S.auto=!S.auto;persist();renderToggles();toast(S.auto?
 $("filmBtn").onclick=()=>{S.film=!S.film;persist();renderToggles();toast(S.film?"粒子・周辺減光：ON":"粒子・周辺減光：OFF");};
 $("frameBtn").onclick=()=>{S.frame=!S.frame;persist();renderToggles();toast(S.frame?"白フチ：ON":"白フチ：OFF");};
 $("afBtn").onclick=()=>{
-  if(!FOC.av.length)return;
+  if(FOC.av.length<2){
+    const r=FOC.raw||{};
+    toast(`切替不可：この端末のピントは「${(r.modes&&r.modes.length?r.modes.join(" / "):"情報なし")}」のみ`+(r.dist?"":"／距離指定なし")+(r.poi?"／タップ位置OK":""),5000);
+    return;
+  }
   S.af=FOC.av[(FOC.av.indexOf(S.af)+1)%FOC.av.length];persist();hideAF();renderToggles();layout();
   applyFocus().then(ok=>toast(!ok?`${S.af}：この端末では反映されませんでした`:S.af==="AF-C"?"AF-C：自動で合わせ続けます（タップで合わせる位置を指定）":S.af==="AF-S"?"AF-S：タップした所で合わせて固定":"MF：目盛りで手動。オレンジの輪郭＝ピントが合っている所"));
 };
