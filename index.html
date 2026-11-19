@@ -79,7 +79,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 <body>
 <div id="app">
   <header>
-    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v8</small></div>
+    <div class="brand"><i></i>写 UTSUSHI<small style="font-size:9px;color:var(--dim);letter-spacing:.05em;font-weight:400">v9</small></div>
     <div class="hbtns">
       <button class="pill" id="autoBtn">AUTO</button>
       <button class="pill" id="aspectBtn">3:2</button>
@@ -662,7 +662,7 @@ function toast(t){const e=$("toast");e.textContent=t;e.style.opacity=1;clearTime
 function renderLooks(){
   const box=$("looks");box.innerHTML="";
   LOOKS.forEach((l,i)=>{const b=document.createElement("button");b.className="chip"+(i===S.look?" on":"");b.textContent=l.name;
-    b.onclick=()=>{S.look=i;persist();renderLooks();};box.appendChild(b);});
+    b.onclick=()=>{S.look=i;persist();renderLooks();renderToggles();};box.appendChild(b);});
 }
 function renderToggles(){
   $("aspectBtn").textContent=ASPECTS[S.aspect].label;
