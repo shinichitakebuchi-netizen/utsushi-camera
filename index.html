@@ -66,6 +66,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
     <div class="brand"><i></i>写 UTSUSHI</div>
     <div class="hbtns">
       <button class="pill" id="aspectBtn">3:2</button>
+      <button class="pill" id="resBtn">MAX</button>
       <button class="pill" id="gridBtn">GRID</button>
       <button class="pill" id="frameBtn">FRAME</button>
       <button class="pill" id="importBtn">読込</button>
@@ -112,6 +113,7 @@ const LOOKS=[
   {name:"MONO",    grain:.045,vig:.32},  // しっとりモノクロ
   {name:"MONO HC", grain:.055,vig:.40}   // 硬調モノクロ
 ];
+const RES=[{label:"MAX",mp:0},{label:"12MP",mp:12},{label:"8MP",mp:8},{label:"4MP",mp:4},{label:"2MP",mp:2}];
 const ASPECTS=[{label:"3:2",v:3/2},{label:"1:1",v:1},{label:"16:9",v:16/9},{label:"4:3",v:4/3}];
 
 // ===== Shader =====
@@ -189,9 +191,9 @@ class Renderer{
 // ===== State =====
 const $=id=>document.getElementById(id);
 const video=$("video"),view=$("view"),stage=$("stage"),msg=$("msg");
-const S={look:0,ev:0,aspect:0,grid:false,frame:false,facing:"environment",stream:null,track:null,shots:[],vi:0,busy:false};
+const S={look:0,ev:0,aspect:0,res:0,grid:false,frame:false,facing:"environment",stream:null,track:null,shots:[],vi:0,busy:false};
 try{Object.assign(S,JSON.parse(localStorage.getItem("utsushi")||"{}"),{stream:null,track:null,shots:[],vi:0,busy:false});}catch(e){}
-const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({look:S.look,ev:S.ev,aspect:S.aspect,grid:S.grid,frame:S.frame,facing:S.facing}));}catch(e){}};
+const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({look:S.look,ev:S.ev,aspect:S.aspect,res:S.res,grid:S.grid,frame:S.frame,facing:S.facing}));}catch(e){}};
 
 let R,EX;
 try{R=new Renderer(view,false);EX=new Renderer(document.createElement("canvas"),true);}
@@ -269,8 +271,12 @@ async function processImage(src,sw,sh,mirror){
   let s=src;
   const lim=Math.min(EX.maxTex,8192);
   const isBmp=typeof ImageBitmap!=="undefined"&&src instanceof ImageBitmap;
-  if(isBmp||Math.max(sw,sh)>lim){
-    const k=Math.min(1,lim/Math.max(sw,sh));const c=document.createElement("canvas");
+  // 解像度設定（切り抜き後の画素数で判定）
+  const c0=cropFor(sw,sh),mp=(RES[S.res]||RES[0]).mp;
+  const area=sw*c0[2]*sh*c0[3];
+  const km=mp&&area>mp*1e6?Math.sqrt(mp*1e6/area):1;
+  if(isBmp||km<1||Math.max(sw,sh)>lim){
+    const k=Math.min(1,lim/Math.max(sw,sh),km);const c=document.createElement("canvas");
     c.width=Math.round(sw*k);c.height=Math.round(sh*k);c.getContext("2d").drawImage(src,0,0,c.width,c.height);
     s=c;sw=c.width;sh=c.height;
   }
@@ -281,7 +287,9 @@ async function processImage(src,sw,sh,mirror){
   EX.draw({crop,look:S.look,exp:S.ev,grain:L.grain,vig:L.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
   let out=EX.c;
   if(S.frame) out=addFrame(EX.c,L.name);
-  return await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
+  const blob=await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
+  blob.w=out.width;blob.h=out.height;
+  return blob;
 }
 
 function addFrame(src,lookName){
@@ -313,7 +321,11 @@ async function capture(){
     if(S.facing==="environment"&&"ImageCapture" in window){
       try{
         const ic=new ImageCapture(S.track);
-        const blob=await timeout(ic.takePhoto(),3500);
+        // 最大解像度で撮影を試す（非対応なら通常撮影）
+        let opt;
+        try{const pc=await timeout(ic.getPhotoCapabilities(),1500);if(pc&&pc.imageWidth&&pc.imageHeight)opt={imageWidth:pc.imageWidth.max,imageHeight:pc.imageHeight.max};}catch(e){}
+        let blob;
+        try{blob=await timeout(ic.takePhoto(opt),4000);}catch(e){if(!opt)throw e;blob=await timeout(ic.takePhoto(),3500);}
         let bmp;try{bmp=await createImageBitmap(blob,{imageOrientation:"from-image"});}catch(e){bmp=await createImageBitmap(blob);}
         if((bmp.width>bmp.height)===(sw>sh)&&bmp.width*bmp.height>sw*sh){src=bmp;sw=bmp.width;sh=bmp.height;}
       }catch(e){}
@@ -328,13 +340,13 @@ async function capture(){
 function fname(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `UTSUSHI_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${Math.floor(Math.random()*90+10)}.jpg`;}
 function addShot(blob){
   const url=URL.createObjectURL(blob);
-  S.shots.push({blob,url,name:fname(),look:LOOKS[S.look].name});
+  S.shots.push({blob,url,name:fname(),look:LOOKS[S.look].name,w:blob.w,h:blob.h});
   $("thumb").style.backgroundImage=`url(${url})`;
 }
 
 // ===== Viewer =====
 function openViewer(i){if(!S.shots.length)return;S.vi=i;showShot();$("viewer").classList.add("on");}
-function showShot(){const s=S.shots[S.vi];$("vimg").src=s.url;$("vinfo").textContent=`${S.vi+1} / ${S.shots.length}　${s.look}`;}
+function showShot(){const s=S.shots[S.vi];$("vimg").src=s.url;$("vinfo").textContent=`${S.vi+1} / ${S.shots.length}　${s.look}　${s.w}×${s.h}（${(s.w*s.h/1e6).toFixed(1)}MP）`;}
 $("vprev").onclick=()=>{if(S.vi>0){S.vi--;showShot();}};
 $("vnext").onclick=()=>{if(S.vi<S.shots.length-1){S.vi++;showShot();}};
 $("vclose").onclick=()=>$("viewer").classList.remove("on");
@@ -369,11 +381,13 @@ function renderLooks(){
 }
 function renderToggles(){
   $("aspectBtn").textContent=ASPECTS[S.aspect].label;
+  $("resBtn").textContent=(RES[S.res]||RES[0]).label;
   $("gridBtn").classList.toggle("on",S.grid);$("grid").classList.toggle("on",S.grid);
   $("frameBtn").classList.toggle("on",S.frame);
   $("ev").value=S.ev;$("evv").textContent=(S.ev>0?"+":S.ev<0?"":"±")+Number(S.ev).toFixed(1);
 }
 $("aspectBtn").onclick=()=>{S.aspect=(S.aspect+1)%ASPECTS.length;persist();renderToggles();layout();};
+$("resBtn").onclick=()=>{S.res=(S.res+1)%RES.length;persist();renderToggles();toast("解像度："+RES[S.res].label);};
 $("gridBtn").onclick=()=>{S.grid=!S.grid;persist();renderToggles();};
 $("frameBtn").onclick=()=>{S.frame=!S.frame;persist();renderToggles();toast(S.frame?"白フチ：ON":"白フチ：OFF");};
 $("ev").oninput=e=>{S.ev=parseFloat(e.target.value);persist();renderToggles();};
