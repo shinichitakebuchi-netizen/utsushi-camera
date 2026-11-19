@@ -134,6 +134,20 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 body[data-rot="90"] #thumb,body[data-rot="90"] #flip{transform:rotate(90deg)}
 body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
 #spacer,#shade{display:none}
+/* ピント枠（タップした所に出る） */
+#af{position:absolute;width:70px;height:70px;margin:-35px 0 0 -35px;pointer-events:none;display:none;z-index:2;--c:var(--acc);
+  background-repeat:no-repeat;background-image:linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),
+    linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c));
+  background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom;
+  background-size:14px 1.5px,1.5px 14px,14px 1.5px,1.5px 14px,14px 1.5px,1.5px 14px,14px 1.5px,1.5px 14px;filter:drop-shadow(0 0 3px rgba(0,0,0,.7))}
+#af::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:var(--c)}
+#af.on{display:block;animation:afin .35s ease-out}
+#af.dim{opacity:.45}
+#af.ng{--c:#9a978f}
+#af b{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:5px;font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;color:var(--c);white-space:nowrap;text-shadow:0 1px 2px #000}
+@keyframes afin{from{transform:scale(1.45)}to{transform:scale(1)}}
+#mfrow{display:none}
+#mfrow.on{display:flex}
 /* 縦画面：ファインダーを全面にして、操作部は上に重ねる */
 @media not all and (orientation:landscape) and (min-aspect-ratio:5/4){
   #stage{position:absolute;inset:0;z-index:0;display:block}
@@ -151,15 +165,16 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
   .looks{-webkit-mask-image:none;mask-image:none}
 }
 @media (orientation:landscape) and (min-aspect-ratio:5/4){
-  #app{display:grid;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto 1fr;
+  #app{display:grid;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto auto 1fr;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
   header{grid-column:2;grid-row:1;flex-direction:column;align-items:stretch;padding:8px 10px 6px}
   .hbtns{justify-content:flex-start}
-  #stage{grid-column:1;grid-row:1/7}
+  #stage{grid-column:1;grid-row:1/8}
   .looks{grid-column:2;grid-row:2;padding:8px 0 2px}
   #tip{grid-column:2;grid-row:3;padding:4px 12px 2px}
   .row{grid-column:2;grid-row:4;padding:2px 12px}
-  .controls{grid-column:2;grid-row:5;padding:8px 18px}
+  #mfrow{grid-column:2;grid-row:5}
+  .controls{grid-column:2;grid-row:6;padding:8px 18px}
   #editor{display:none;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto auto 1fr}
   #editor.on{display:grid}
   #editor .ebar{grid-column:2;grid-row:1}
@@ -184,10 +199,11 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
 <body>
 <div id="app">
   <header>
-    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v13</small></div>
+    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v14</small></div>
     <div class="hbtns">
       <button class="pill tg" id="autoBtn">AUTO</button>
       <button class="pill tg" id="meterBtn">METER</button>
+      <button class="pill cyc" id="afBtn" style="display:none">AF-C</button>
       <button class="pill cyc" id="aspectBtn">3:2</button>
       <button class="pill cyc" id="resBtn">MAX</button>
       <button class="pill tg" id="gridBtn">GRID</button>
@@ -200,6 +216,7 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
     <canvas id="view"></canvas>
     <div id="grid"></div>
     <div id="vf"><div id="vfbar"></div><div class="meter" id="meter"></div></div>
+    <div id="af"><b></b></div>
     <div id="level"></div>
     <div id="flash"></div>
     <div id="zoom"></div>
@@ -210,6 +227,7 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
   <div class="looks" id="looks"></div>
   <div id="tip"></div>
   <div class="row">EV <div class="rwrap"><div class="ruler" id="evr"></div><b class="needle"></b></div><span class="v" id="evv">±0.0</span></div>
+  <div class="row" id="mfrow">MF <div class="rwrap"><div class="ruler" id="mfr"></div><b class="needle"></b></div><span class="v" id="mfv"></span></div>
   <div class="controls">
     <button id="thumb" aria-label="写真"></button>
     <button id="shutter" aria-label="撮影"></button>
@@ -290,6 +308,7 @@ uniform vec2 u_res;
 uniform float u_look2,u_split,u_orig;
 uniform vec4 u_tile;
 uniform vec2 u_poff;
+uniform float u_peak;
 const float N=17.;
 float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
@@ -343,6 +362,14 @@ void main(){
   float L2=luma(c); float w=1.-pow(abs(L2-.5)*2.,2.);
   c+=n*u_grain*(.35+.65*w);
   if(u_split<1.5&&abs(g.x-u_split)*u_res.x<1.5) c=vec3(1.);   // 比較の境目に白線
+  // フォーカスピーキング（MF中のプレビューだけ）：ピントの合った輪郭をオレンジで表示
+  if(u_peak>.5){
+    vec2 q=u_px*1.5;
+    float a1=luma(texture2D(u_tex,tuv+vec2(q.x,0.)).rgb),a2=luma(texture2D(u_tex,tuv-vec2(q.x,0.)).rgb);
+    float b1=luma(texture2D(u_tex,tuv+vec2(0.,q.y)).rgb),b2=luma(texture2D(u_tex,tuv-vec2(0.,q.y)).rgb);
+    float ed=abs(a1-a2)+abs(b1-b2);
+    c=mix(c,vec3(1.,.48,.1),smoothstep(.2,.36,ed));
+  }
   gl_FragColor=vec4(clamp(c,0.,1.),1.);
 }`;
 
@@ -365,7 +392,7 @@ class Renderer{
     [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR]]
       .forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v));
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);this.tex=t;this.lutReady=false;
-    this.u={};["u_tile","u_poff","u_look2","u_split","u_orig","u_lut","u_nlooks","u_wb","u_clar","u_nr","u_px","u_tex","u_crop","u_look","u_exp","u_grain","u_vig","u_seed","u_mirror","u_gsize","u_res"].forEach(n=>this.u[n]=gl.getUniformLocation(pr,n));
+    this.u={};["u_peak","u_tile","u_poff","u_look2","u_split","u_orig","u_lut","u_nlooks","u_wb","u_clar","u_nr","u_px","u_tex","u_crop","u_look","u_exp","u_grain","u_vig","u_seed","u_mirror","u_gsize","u_res"].forEach(n=>this.u[n]=gl.getUniformLocation(pr,n));
     this.maxTex=gl.getParameter(gl.MAX_TEXTURE_SIZE);
   }
   setLut(img){const gl=this.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.lt);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
@@ -381,19 +408,21 @@ class Renderer{
     gl.uniform1f(u.u_nr,o.nr||0);const px=o.px||[0,0];gl.uniform2f(u.u_px,px[0],px[1]);gl.uniform4f(u.u_crop,o.crop[0],o.crop[1],o.crop[2],o.crop[3]);
     gl.uniform1f(u.u_look,o.look);gl.uniform1f(u.u_look2,o.look2==null?o.look:o.look2);
     gl.uniform1f(u.u_split,o.split==null?2.:o.split);gl.uniform1f(u.u_orig,o.orig?1:0);gl.uniform1f(u.u_exp,o.exp);gl.uniform1f(u.u_grain,o.grain);gl.uniform1f(u.u_vig,o.vig);
-    gl.uniform1f(u.u_seed,o.seed);gl.uniform1f(u.u_mirror,o.mirror?1:0);gl.uniform1f(u.u_gsize,o.gsize||1);
+    gl.uniform1f(u.u_seed,o.seed);gl.uniform1f(u.u_mirror,o.mirror?1:0);gl.uniform1f(u.u_gsize,o.gsize||1);gl.uniform1f(u.u_peak,o.peak?1:0);
     const rs=o.res||[this.c.width,this.c.height];gl.uniform2f(u.u_res,rs[0],rs[1]);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
   }
 }
 
 // ===== State =====
+const MF_N_DEFAULT=40;
 const $=id=>document.getElementById(id);
 const video=$("video"),view=$("view"),stage=$("stage"),msg=$("msg");
-const S={auto:true,meter:true,look:0,ev:0,aspect:0,res:0,film:true,grid:true,frame:false,facing:"environment",stream:null,track:null,shots:[],vi:0,busy:false};
+const S={auto:true,meter:true,af:"AF-C",mfk:MF_N_DEFAULT,look:0,ev:0,aspect:0,res:0,film:true,grid:true,frame:false,facing:"environment",stream:null,track:null,shots:[],vi:0,busy:false};
 try{Object.assign(S,JSON.parse(localStorage.getItem("utsushi")||"{}"),{stream:null,track:null,shots:[],vi:0,busy:false});}catch(e){}
 if(!(S.look>=0&&S.look<9))S.look=0;
-const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({auto:S.auto,meter:S.meter,film:S.film,look:S.look,ev:S.ev,aspect:S.aspect,res:S.res,grid:S.grid,frame:S.frame,facing:S.facing}));}catch(e){}};
+if(!(Number.isInteger(S.mfk)&&S.mfk>=0&&S.mfk<=MF_N_DEFAULT))S.mfk=MF_N_DEFAULT;
+const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({auto:S.auto,meter:S.meter,af:S.af,mfk:S.mfk,film:S.film,look:S.look,ev:S.ev,aspect:S.aspect,res:S.res,grid:S.grid,frame:S.frame,facing:S.facing}));}catch(e){}};
 
 let R,EX;
 try{R=new Renderer(view,false);EX=new Renderer(document.createElement("canvas"),true);}
@@ -555,7 +584,7 @@ function loop(){
   if(!R.lutReady) return;
   if(S.auto) updateAuto();
   const A=autoParams(AUTO),F=film(S.auto?AUTO:null);
-  R.draw({crop:cropFor(video.videoWidth,video.videoHeight),look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[1/video.videoWidth,1/video.videoHeight],grain:F.grain,vig:F.vig,seed:(fr++%60)*1.37,mirror:S.facing==="user",gsize:1});
+  R.draw({peak:S.af==="MF",crop:cropFor(video.videoWidth,video.videoHeight),look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[1/video.videoWidth,1/video.videoHeight],grain:F.grain,vig:F.vig,seed:(fr++%60)*1.37,mirror:S.facing==="user",gsize:1});
   // 描画直後に測る（同じフレーム内なら画面の絵を読める）
   const now=performance.now();
   if(now-meterT>250){
@@ -582,7 +611,7 @@ async function startCamera(){
     S.stream=st;S.track=st.getVideoTracks()[0];
     video.srcObject=st;await video.play();
     msg.style.display="none";
-    setupZoom();
+    setupZoom();setupFocus();
     setTimeout(layout,50);
   }catch(e){
     msg.innerHTML=`カメラを開けませんでした（${e.name||e.message}）<br>ブラウザの設定でカメラを許可してね。<br><button id="retry">もう一度</button>`;
@@ -603,6 +632,67 @@ function setupZoom(){
     z.appendChild(b);
   });
 }
+
+// ===== ピント（AF-C：自動で合わせ続ける／AF-S：タップした所で合わせて固定／MF：目盛りで手動） =====
+const FOC={av:[],dist:null,poi:false,busy:false,again:false};
+const AF_MODE={"AF-C":"continuous","AF-S":"single-shot","MF":"manual"};
+function mfDist(k){
+  const d=FOC.dist;if(!d)return null;const t=k/MF_N;
+  if(d.min>0&&d.max/d.min>4)return d.min*Math.pow(d.max/d.min,t);   // 近い側を細かく
+  return d.min+(d.max-d.min)*t;
+}
+function setupFocus(){
+  const caps=S.track&&S.track.getCapabilities?S.track.getCapabilities():{};
+  const sup=navigator.mediaDevices.getSupportedConstraints?navigator.mediaDevices.getSupportedConstraints():{};
+  const modes=caps.focusMode||[];
+  FOC.dist=caps.focusDistance&&caps.focusDistance.max>caps.focusDistance.min?caps.focusDistance:null;
+  FOC.poi=!!sup.pointsOfInterest;
+  FOC.av=[];
+  if(modes.includes("continuous"))FOC.av.push("AF-C");
+  if(modes.includes("single-shot"))FOC.av.push("AF-S");
+  if(modes.includes("manual")&&FOC.dist)FOC.av.push("MF");
+  if(!FOC.av.includes(S.af))S.af=FOC.av[0]||null;
+  hideAF();renderToggles();applyFocus();
+}
+async function applyFocus(extra){
+  if(!S.track||!S.af)return false;
+  if(FOC.busy){FOC.again=extra||true;return true;}   // 連続操作は最後の1回だけ反映
+  FOC.busy=true;
+  const c={focusMode:AF_MODE[S.af]};
+  if(S.af==="MF"){const d=mfDist(S.mfk);if(d!=null)c.focusDistance=Math.min(FOC.dist.max,Math.max(FOC.dist.min,d));}
+  if(extra&&extra!==true)Object.assign(c,extra);
+  let ok=true;
+  try{await S.track.applyConstraints({advanced:[c]});
+    const st=S.track.getSettings?S.track.getSettings():{};
+    if(st.focusMode&&st.focusMode!==c.focusMode)ok=false;
+  }catch(e){ok=false;}
+  FOC.busy=false;
+  if(FOC.again){const x=FOC.again;FOC.again=false;applyFocus(x);}
+  return ok;
+}
+function hideAF(){const a=$("af");a.classList.remove("on","dim","ng");clearTimeout(hideAF.t);}
+function showAF(x,y,label,ok,keep){
+  const a=$("af");hideAF();void a.offsetWidth;
+  a.style.left=x+"px";a.style.top=y+"px";a.querySelector("b").textContent=label;
+  a.classList.add("on");a.classList.toggle("ng",!ok);
+  hideAF.t=setTimeout(()=>{if(keep)a.classList.add("dim");else a.classList.remove("on");},1400);
+}
+view.addEventListener("click",async e=>{
+  if(!S.track||!video.videoWidth)return;
+  if(!S.af){toast("この端末ではピントの操作に対応していません");return;}
+  if(S.af==="MF"){toast("MF中：下の目盛りでピントを合わせてね（オレンジの輪郭＝合っている所）");return;}
+  const r=view.getBoundingClientRect(),sr=stage.getBoundingClientRect();
+  let nx=(e.clientX-r.left)/r.width,ny=(e.clientY-r.top)/r.height;
+  if(S.facing==="user")nx=1-nx;
+  const c=cropFor(video.videoWidth,video.videoHeight);
+  const p={x:Math.min(1,Math.max(0,c[0]+nx*c[2])),y:Math.min(1,Math.max(0,c[1]+ny*c[3]))};
+  const x=e.clientX-sr.left,y=e.clientY-sr.top;
+  if(!FOC.poi){showAF(x,y,"非対応",false,false);toast("この端末ではタップでピントに対応していません");return;}
+  showAF(x,y,S.af==="AF-S"?"AF-S  LOCK":"AF-C",true,S.af==="AF-S");
+  if(navigator.vibrate)navigator.vibrate(8);
+  const ok=await applyFocus({pointsOfInterest:[p]});
+  if(!ok){$("af").classList.add("ng");$("af").querySelector("b").textContent="失敗";}
+});
 
 // ===== Process / capture =====
 function timeout(p,ms){return Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),ms))]);}
@@ -867,34 +957,44 @@ function renderLooks(){
   const on=box.children[S.look];if(on&&on.scrollIntoView)on.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
 }
 // EVダイヤル：目盛りを左右にスクロールして0.1刻みで合わせる（ダブルタップで0に戻す）
-function makeRuler(el,valEl,onSet){
-  const STEP=10,MIN=-15,MAX=15;
+// 目盛りダイヤル：左右スクロールで1目盛りずつ合わせる（ダブルタップで初期値）
+// o={min,max,get,set,fmt,label,major,zero,reset}
+function makeRuler(el,valEl,o){
+  const STEP=10,MIN=o.min,MAX=o.max;
   const tr=document.createElement("div");tr.className="rtrack";
   for(let i=MIN;i<=MAX;i++){const t=document.createElement("span");
-    t.className="tk"+(i%5===0?" mj":"")+(i===0?" z":"");
-    if(i%5===0)t.dataset.l=i===0?"0":(i>0?"+":"−")+Math.abs(i/10);
+    t.className="tk"+(o.major(i)?" mj":"")+(o.zero&&o.zero(i)?" z":"");
+    const l=o.label(i);if(l!=null)t.dataset.l=l;
     tr.appendChild(t);}
   el.appendChild(tr);
   let touching=false,lastW=0,st=null;
   const pad=()=>{const w=el.clientWidth;if(w&&w!==lastW){lastW=w;tr.style.padding=`0 ${w/2-STEP/2}px`;}return w;};
-  const show=v=>{valEl.textContent=fmtEV(v);};
-  const R={sync(){if(!pad())return;show(S.ev);if(touching)return;
-      const x=Math.round(S.ev*10-MIN)*STEP;if(Math.abs(el.scrollLeft-x)>1)el.scrollLeft=x;}};
+  const show=i=>{valEl.textContent=o.fmt(i);};
+  const R={sync(){show(o.get());if(!pad()||touching)return;
+      const x=(o.get()-MIN)*STEP;if(Math.abs(el.scrollLeft-x)>1)el.scrollLeft=x;}};
   el.addEventListener("scroll",()=>{
     if(!lastW)return;
-    const k=Math.max(0,Math.min(MAX-MIN,Math.round(el.scrollLeft/STEP))),v=Math.round(k+MIN)/10;
-    if(Math.abs(v-S.ev)>.001){show(v);onSet(v);if(touching&&navigator.vibrate)navigator.vibrate(3);}
+    const i=Math.max(MIN,Math.min(MAX,Math.round(el.scrollLeft/STEP)+MIN));
+    if(i!==o.get()){show(i);o.set(i);if(touching&&navigator.vibrate)navigator.vibrate(3);}
   },{passive:true});
   el.addEventListener("touchstart",()=>{touching=true;clearTimeout(st);},{passive:true});
   el.addEventListener("touchend",()=>{clearTimeout(st);st=setTimeout(()=>{touching=false;},600);},{passive:true});
   el.addEventListener("pointerdown",()=>{touching=true;clearTimeout(st);});
   el.addEventListener("pointerup",()=>{clearTimeout(st);st=setTimeout(()=>{touching=false;},600);});
-  let lt=0;el.addEventListener("click",()=>{const t=Date.now();if(t-lt<300){touching=false;onSet(0);R.sync();}lt=t;});
+  let lt=0;el.addEventListener("click",()=>{const t=Date.now();if(t-lt<300){touching=false;o.set(o.reset);R.sync();}lt=t;});
   window.addEventListener("resize",()=>setTimeout(()=>R.sync(),150));
   return R;
 }
-const evRuler=makeRuler($("evr"),$("evv"),v=>{S.ev=v;persist();renderToggles();});
-const eevRuler=makeRuler($("eevr"),$("eevv"),v=>{S.ev=v;persist();renderToggles();edRender();});
+const EVR={min:-15,max:15,get:()=>Math.round(S.ev*10),fmt:i=>fmtEV(i/10),major:i=>i%5===0,zero:i=>i===0,reset:0,
+  label:i=>i%5!==0?null:i===0?"0":(i>0?"+":"−")+Math.abs(i/10)};
+const evRuler=makeRuler($("evr"),$("evv"),{...EVR,set:i=>{S.ev=i/10;persist();renderToggles();}});
+const eevRuler=makeRuler($("eevr"),$("eevv"),{...EVR,set:i=>{S.ev=i/10;persist();renderToggles();edRender();}});
+// MFダイヤル：端末が返す focusDistance の範囲を40目盛りに割り当て（左＝近い、右＝遠い）
+const MF_N=40;
+const mfRuler=makeRuler($("mfr"),$("mfv"),{min:0,max:MF_N,get:()=>S.mfk,reset:MF_N,major:i=>i%10===0,
+  label:i=>i===0?"近":i===MF_N?"遠":null,
+  fmt:i=>{const d=mfDist(i);return d==null?"—":d>=10?"∞":d>=1?d.toFixed(1)+"m":Math.round(d*100)+"cm";},
+  set:i=>{S.mfk=i;persist();applyFocus();}});
 const mainMeter=makeMeter($("meter")),editMeter=makeMeter($("emeter"));
 function renderToggles(){
   $("aspectBtn").textContent=ASPECTS[S.aspect].label;
@@ -907,6 +1007,8 @@ function renderToggles(){
   $("filmBtn").classList.toggle("on",S.film);
   $("meterBtn").classList.toggle("on",S.meter);$("meter").classList.toggle("on",S.meter);
   evRuler.sync();renderVfbar();
+  const ab=$("afBtn");ab.style.display=FOC.av.length?"":"none";ab.textContent=S.af||"AF";
+  $("mfrow").classList.toggle("on",S.af==="MF");if(S.af==="MF")mfRuler.sync();
 }
 $("aspectBtn").onclick=()=>{S.aspect=(S.aspect+1)%ASPECTS.length;persist();renderToggles();layout();};
 $("resBtn").onclick=()=>{S.res=(S.res+1)%RES.length;persist();renderToggles();toast("解像度："+RES[S.res].label);};
@@ -914,6 +1016,11 @@ $("gridBtn").onclick=async()=>{S.grid=!S.grid;persist();if(S.grid)await startLev
 $("autoBtn").onclick=()=>{S.auto=!S.auto;persist();renderToggles();toast(S.auto?"おまかせ補正：ON（色かぶり・明るさを自動で整えます）":"おまかせ補正：OFF");};
 $("filmBtn").onclick=()=>{S.film=!S.film;persist();renderToggles();toast(S.film?"粒子・周辺減光：ON":"粒子・周辺減光：OFF");};
 $("frameBtn").onclick=()=>{S.frame=!S.frame;persist();renderToggles();toast(S.frame?"白フチ：ON":"白フチ：OFF");};
+$("afBtn").onclick=()=>{
+  if(!FOC.av.length)return;
+  S.af=FOC.av[(FOC.av.indexOf(S.af)+1)%FOC.av.length];persist();hideAF();renderToggles();layout();
+  applyFocus().then(ok=>toast(!ok?`${S.af}：この端末では反映されませんでした`:S.af==="AF-C"?"AF-C：自動で合わせ続けます（タップで合わせる位置を指定）":S.af==="AF-S"?"AF-S：タップした所で合わせて固定":"MF：目盛りで手動。オレンジの輪郭＝ピントが合っている所"));
+};
 $("meterBtn").onclick=()=>{S.meter=!S.meter;persist();renderToggles();toast(S.meter?"測光メーター：ON（いまの明るさ・AUTOの補正量を表示）":"測光メーター：OFF");};
 $("shutter").onclick=capture;
 $("thumb").onclick=()=>openViewer(S.shots.length-1);
