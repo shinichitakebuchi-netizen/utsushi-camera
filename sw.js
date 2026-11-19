@@ -1,5 +1,5 @@
 // 写 UTSUSHI service worker（ネット優先・オフライン時はキャッシュ）
-const CACHE = "utsushi-v2";
+const CACHE = "utsushi-v3";
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-180.png"];
 
 self.addEventListener("install", e => {
