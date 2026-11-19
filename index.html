@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>写 UTSUSHI</title>
+<style>
+:root{--acc:#ff7a1a;--fg:#f2f0eb;--dim:#8a8780;--line:#2e2e2e}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;color:var(--fg);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:8px}
+.brand{font-size:14px;font-weight:600;letter-spacing:.22em;display:flex;align-items:center;gap:8px}
+.brand i{width:8px;height:8px;border-radius:50%;background:var(--acc);display:inline-block}
+.hbtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pill{background:none;border:1px solid var(--line);color:var(--dim);border-radius:16px;padding:5px 11px;font-size:11px;letter-spacing:.08em}
+.pill.on{border-color:var(--acc);color:var(--acc)}
+#stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+#view{display:block;background:#0c0c0c}
+#grid{position:absolute;pointer-events:none;display:none}
+#grid.on{display:block}
+#grid::before{content:"";position:absolute;left:33.333%;width:33.333%;top:0;height:100%;border-left:1px solid rgba(255,255,255,.28);border-right:1px solid rgba(255,255,255,.28)}
+#grid::after{content:"";position:absolute;top:33.333%;height:33.333%;left:0;width:100%;border-top:1px solid rgba(255,255,255,.28);border-bottom:1px solid rgba(255,255,255,.28)}
+#flash{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .18s}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:13px;line-height:1.8;color:var(--dim)}
+#msg button{margin-top:14px;background:var(--acc);color:#000;border:none;border-radius:20px;padding:10px 22px;font-weight:600}
+#zoom{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+#zoom button{width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);color:var(--fg);font-size:11px}
+#zoom button.on{color:var(--acc);border-color:var(--acc)}
+.looks{display:flex;gap:8px;overflow-x:auto;padding:12px 14px 6px;scrollbar-width:none}
+.looks::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:7px 14px;border-radius:18px;border:1px solid var(--line);font-size:11px;letter-spacing:.14em;color:var(--dim);background:none}
+.chip.on{color:#000;background:var(--fg);border-color:var(--fg)}
+.row{display:flex;align-items:center;gap:10px;padding:4px 18px;font-size:11px;color:var(--dim);letter-spacing:.08em}
+.row input{flex:1;accent-color:var(--acc)}
+.row span.v{width:38px;text-align:right;color:var(--fg)}
+.controls{display:flex;align-items:center;justify-content:space-between;padding:10px 34px 18px}
+#thumb{width:54px;height:54px;border-radius:10px;background:#161616 center/cover no-repeat;border:1px solid var(--line)}
+#shutter{width:78px;height:78px;border-radius:50%;border:4px solid var(--fg);background:none;position:relative}
+#shutter::after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--fg);transition:transform .1s}
+#shutter:active::after{transform:scale(.88)}
+#shutter.busy::after{background:var(--acc)}
+.round{width:54px;height:54px;border-radius:50%;background:#161616;border:1px solid var(--line);color:var(--fg);font-size:20px}
+#viewer{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#viewer.on{display:flex}
+#viewer .imgwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:10px}
+#viewer img{max-width:100%;max-height:100%;object-fit:contain}
+#viewer .bar{display:flex;gap:8px;justify-content:center;padding:12px;flex-wrap:wrap}
+#viewer .bar button{background:#1a1a1a;color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:10px 16px;font-size:12px}
+#viewer .bar button.pri{background:var(--acc);color:#000;border-color:var(--acc);font-weight:600}
+#vinfo{text-align:center;font-size:11px;color:var(--dim);letter-spacing:.1em}
+#toast{position:fixed;left:50%;bottom:140px;transform:translateX(-50%);background:rgba(30,30,30,.92);color:var(--fg);padding:8px 16px;border-radius:16px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><i></i>写 UTSUSHI</div>
+    <div class="hbtns">
+      <button class="pill" id="aspectBtn">3:2</button>
+      <button class="pill" id="gridBtn">GRID</button>
+      <button class="pill" id="frameBtn">FRAME</button>
+      <button class="pill" id="importBtn">読込</button>
+    </div>
+  </header>
+  <div id="stage">
+    <canvas id="view"></canvas>
+    <div id="grid"></div>
+    <div id="flash"></div>
+    <div id="zoom"></div>
+    <div id="msg">カメラを起動中…</div>
+  </div>
+  <div class="looks" id="looks"></div>
+  <div class="row">EV <input type="range" id="ev" min="-1.5" max="1.5" step="0.1" value="0"><span class="v" id="evv">±0.0</span></div>
+  <div class="controls">
+    <button id="thumb" aria-label="写真"></button>
+    <button id="shutter" aria-label="撮影"></button>
+    <button class="round" id="flip" aria-label="カメラ切替">⟲</button>
+  </div>
+</div>
+
+<div id="viewer">
+  <div class="imgwrap"><img id="vimg" alt=""></div>
+  <div id="vinfo"></div>
+  <div class="bar">
+    <button id="vprev">‹</button>
+    <button class="pri" id="vshare">共有 / 保存</button>
+    <button id="vdl">ダウンロード</button>
+    <button id="vnext">›</button>
+    <button id="vclose">閉じる</button>
+  </div>
+</div>
+<div id="toast"></div>
+<video id="video" playsinline muted autoplay style="display:none"></video>
+<input type="file" id="file" accept="image/*" multiple style="display:none">
+
+<script>
+"use strict";
+// ===== Looks =====
+const LOOKS=[
+  {name:"CLASSIC", grain:.035,vig:.38},  // 渋めの発色・暖色寄り・黒を少し浮かせる
+  {name:"VIVID",   grain:.025,vig:.30},  // コントラスト強め・発色しっかり
+  {name:"NATURAL", grain:.015,vig:.18},  // 素直な色
+  {name:"MONO",    grain:.045,vig:.32},  // しっとりモノクロ
+  {name:"MONO HC", grain:.055,vig:.40}   // 硬調モノクロ
+];
+const ASPECTS=[{label:"3:2",v:3/2},{label:"1:1",v:1},{label:"16:9",v:16/9},{label:"4:3",v:4/3}];
+
+// ===== Shader =====
+const VS=`attribute vec2 p;varying vec2 v_uv;void main(){v_uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
+const FS=`precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec4 u_crop;
+uniform float u_look,u_exp,u_grain,u_vig,u_seed,u_mirror,u_gsize;
+uniform vec2 u_res;
+float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float luma(vec3 c){return dot(c,vec3(.2126,.7152,.0722));}
+float sc1(float x,float k){x=clamp(x,0.,1.);return x<.5?.5*pow(2.*x,k):1.-.5*pow(2.*(1.-x),k);}
+vec3 sc(vec3 c,float k){return vec3(sc1(c.r,k),sc1(c.g,k),sc1(c.b,k));}
+vec3 sat(vec3 c,float s){return mix(vec3(luma(c)),c,s);}
+void main(){
+  vec2 uv=v_uv; if(u_mirror>.5) uv.x=1.-uv.x;
+  vec3 c=texture2D(u_tex,u_crop.xy+uv*u_crop.zw).rgb;
+  vec3 l=pow(max(c,0.),vec3(2.2))*exp2(u_exp);
+  l=l*1.2/(1.+l*.2);
+  c=pow(max(l,0.),vec3(1./2.2));
+  if(u_look<.5){
+    c=sc(c,1.22); c=sat(c,.82); c*=vec3(1.035,1.,.95);
+    float L=luma(c); c+=vec3(-.012,0.,.02)*(1.-smoothstep(0.,.4,L));
+    c=mix(vec3(.035,.03,.03),vec3(.985,.97,.94),clamp(c,0.,1.));
+  }else if(u_look<1.5){
+    c=sc(c,1.45); c=sat(c,1.18); c*=vec3(1.02,1.,.97);
+  }else if(u_look<2.5){
+    c=sc(c,1.1); c=sat(c,.95);
+  }else if(u_look<3.5){
+    float m=dot(c,vec3(.33,.5,.17)); m=sc1(m,1.4);
+    c=mix(vec3(.03),vec3(.97,.965,.95),m);
+  }else{
+    float m=dot(c,vec3(.45,.45,.10)); m=sc1(m,2.0); m=smoothstep(.04,.96,m);
+    c=vec3(m);
+  }
+  vec2 p=(v_uv-.5)*2.; float ar=u_res.x/u_res.y; p.x*=ar;
+  float r=length(p)/length(vec2(ar,1.));
+  c*=1.-u_vig*pow(r,2.4);
+  float n=hash(floor(gl_FragCoord.xy/u_gsize)+u_seed)-.5;
+  float L2=luma(c); float w=1.-pow(abs(L2-.5)*2.,2.);
+  c+=n*u_grain*(.35+.65*w);
+  gl_FragColor=vec4(clamp(c,0.,1.),1.);
+}`;
+
+class Renderer{
+  constructor(canvas,keep){
+    const gl=canvas.getContext("webgl",{preserveDrawingBuffer:!!keep,antialias:false,premultipliedAlpha:false});
+    if(!gl) throw new Error("WebGL非対応");
+    this.gl=gl;this.c=canvas;
+    const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;};
+    const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    gl.useProgram(pr);this.pr=pr;
+    const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+    const a=gl.getAttribLocation(pr,"p");gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+    const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+    [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR]]
+      .forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v));
+    this.u={};["u_tex","u_crop","u_look","u_exp","u_grain","u_vig","u_seed","u_mirror","u_gsize","u_res"].forEach(n=>this.u[n]=gl.getUniformLocation(pr,n));
+    this.maxTex=gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  }
+  upload(src){const gl=this.gl;gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,src);}
+  draw(o){
+    const gl=this.gl,u=this.u;gl.viewport(0,0,this.c.width,this.c.height);
+    gl.uniform1i(u.u_tex,0);gl.uniform4f(u.u_crop,o.crop[0],o.crop[1],o.crop[2],o.crop[3]);
+    gl.uniform1f(u.u_look,o.look);gl.uniform1f(u.u_exp,o.exp);gl.uniform1f(u.u_grain,o.grain);gl.uniform1f(u.u_vig,o.vig);
+    gl.uniform1f(u.u_seed,o.seed);gl.uniform1f(u.u_mirror,o.mirror?1:0);gl.uniform1f(u.u_gsize,o.gsize||1);
+    gl.uniform2f(u.u_res,this.c.width,this.c.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  }
+}
+
+// ===== State =====
+const $=id=>document.getElementById(id);
+const video=$("video"),view=$("view"),stage=$("stage"),msg=$("msg");
+const S={look:0,ev:0,aspect:0,grid:false,frame:false,facing:"environment",stream:null,track:null,shots:[],vi:0,busy:false};
+try{Object.assign(S,JSON.parse(localStorage.getItem("utsushi")||"{}"),{stream:null,track:null,shots:[],vi:0,busy:false});}catch(e){}
+const persist=()=>{try{localStorage.setItem("utsushi",JSON.stringify({look:S.look,ev:S.ev,aspect:S.aspect,grid:S.grid,frame:S.frame,facing:S.facing}));}catch(e){}};
+
+let R,EX;
+try{R=new Renderer(view,false);EX=new Renderer(document.createElement("canvas"),true);}
+catch(e){msg.textContent="この端末ではWebGLが使えません："+e.message;}
+
+function cropFor(sw,sh){
+  let A=ASPECTS[S.aspect].v; if(sh>sw) A=1/A;
+  const sa=sw/sh;
+  if(sa>A){const w=A/sa;return[(1-w)/2,0,w,1];}
+  const h=sa/A;return[0,(1-h)/2,1,h];
+}
+function targetAspect(sw,sh){let A=ASPECTS[S.aspect].v;return sh>sw?1/A:A;}
+
+function layout(){
+  const vw=video.videoWidth||1280,vh=video.videoHeight||720;
+  const A=targetAspect(vw,vh);
+  const r=stage.getBoundingClientRect();
+  let w,h; if(r.width/r.height>A){h=r.height;w=h*A;}else{w=r.width;h=w/A;}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  view.style.width=w+"px";view.style.height=h+"px";
+  view.width=Math.round(w*dpr);view.height=Math.round(h*dpr);
+  const g=$("grid");g.style.width=w+"px";g.style.height=h+"px";
+  g.style.left=(r.width-w)/2+"px";g.style.top=(r.height-h)/2+"px";
+}
+
+let fr=0;
+function loop(){
+  requestAnimationFrame(loop);
+  if(!R||video.readyState<2||!video.videoWidth) return;
+  R.upload(video);
+  const L=LOOKS[S.look];
+  R.draw({crop:cropFor(video.videoWidth,video.videoHeight),look:S.look,exp:S.ev,grain:L.grain,vig:L.vig,seed:(fr++%60)*1.37,mirror:S.facing==="user",gsize:1});
+}
+
+// ===== Camera =====
+async function startCamera(){
+  stopCamera();
+  msg.style.display="flex";msg.textContent="カメラを起動中…";
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    msg.innerHTML="カメラが使えません。<br>HTTPS（GitHub Pagesなど）で開いてね。";return;
+  }
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:S.facing},width:{ideal:3840},height:{ideal:2160}}});
+    S.stream=st;S.track=st.getVideoTracks()[0];
+    video.srcObject=st;await video.play();
+    msg.style.display="none";
+    setupZoom();
+    setTimeout(layout,50);
+  }catch(e){
+    msg.innerHTML=`カメラを開けませんでした（${e.name||e.message}）<br>ブラウザの設定でカメラを許可してね。<br><button id="retry">もう一度</button>`;
+    $("retry").onclick=startCamera;
+  }
+}
+function stopCamera(){if(S.stream){S.stream.getTracks().forEach(t=>t.stop());S.stream=null;S.track=null;}}
+
+function setupZoom(){
+  const z=$("zoom");z.innerHTML="";
+  const caps=S.track&&S.track.getCapabilities?S.track.getCapabilities():{};
+  if(!caps.zoom) return;
+  const lv=[1,2,3,5].filter(v=>v>=caps.zoom.min&&v<=caps.zoom.max);
+  if(lv.length<2) return;
+  lv.forEach(v=>{
+    const b=document.createElement("button");b.textContent=v+"×";if(v===1)b.classList.add("on");
+    b.onclick=async()=>{try{await S.track.applyConstraints({advanced:[{zoom:v}]});[...z.children].forEach(c=>c.classList.toggle("on",c===b));}catch(e){}};
+    z.appendChild(b);
+  });
+}
+
+// ===== Process / capture =====
+function timeout(p,ms){return Promise.race([p,new Promise((_,rj)=>setTimeout(()=>rj(new Error("timeout")),ms))]);}
+
+async function processImage(src,sw,sh,mirror){
+  // テクスチャ上限を超える場合は縮小
+  let s=src;
+  const lim=Math.min(EX.maxTex,8192);
+  if(Math.max(sw,sh)>lim){
+    const k=lim/Math.max(sw,sh);const c=document.createElement("canvas");
+    c.width=Math.round(sw*k);c.height=Math.round(sh*k);c.getContext("2d").drawImage(src,0,0,c.width,c.height);
+    s=c;sw=c.width;sh=c.height;
+  }
+  const crop=cropFor(sw,sh);
+  EX.c.width=Math.round(sw*crop[2]);EX.c.height=Math.round(sh*crop[3]);
+  EX.upload(s);
+  const L=LOOKS[S.look];
+  EX.draw({crop,look:S.look,exp:S.ev,grain:L.grain,vig:L.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
+  let out=EX.c;
+  if(S.frame) out=addFrame(EX.c,L.name);
+  return await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
+}
+
+function addFrame(src,lookName){
+  const W=src.width,H=src.height,s=Math.min(W,H);
+  const side=Math.round(s*.035),bottom=Math.round(s*.11);
+  const c=document.createElement("canvas");c.width=W+side*2;c.height=H+side+bottom;
+  const x=c.getContext("2d");
+  x.fillStyle="#f7f6f2";x.fillRect(0,0,c.width,c.height);
+  x.drawImage(src,side,side);
+  const y=side+H+bottom/2,fs=Math.round(bottom*.2);
+  x.textBaseline="middle";
+  x.fillStyle="#ff7a1a";x.beginPath();x.arc(side+fs*.4,y,fs*.3,0,Math.PI*2);x.fill();
+  x.fillStyle="#1a1a1a";x.textAlign="left";x.font=`600 ${fs}px -apple-system,"Helvetica Neue",Arial,sans-serif`;
+  x.fillText("UTSUSHI",side+fs*1.1,y);
+  const d=new Date(),pad=n=>String(n).padStart(2,"0");
+  x.fillStyle="#7a7a7a";x.textAlign="right";x.font=`400 ${Math.round(fs*.82)}px -apple-system,"Helvetica Neue",Arial,sans-serif`;
+  x.fillText(`${lookName}   ${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,side+W,y);
+  return c;
+}
+
+async function capture(){
+  if(S.busy||!S.track||!EX) return;
+  S.busy=true;$("shutter").classList.add("busy");
+  const f=$("flash");f.style.opacity=.85;setTimeout(()=>f.style.opacity=0,120);
+  if(navigator.vibrate) navigator.vibrate(15);
+  try{
+    let src=video,sw=video.videoWidth,sh=video.videoHeight;
+    // 背面カメラは高解像度の静止画を試す（Android Chromeなど）
+    if(S.facing==="environment"&&"ImageCapture" in window){
+      try{
+        const ic=new ImageCapture(S.track);
+        const blob=await timeout(ic.takePhoto(),3500);
+        let bmp;try{bmp=await createImageBitmap(blob,{imageOrientation:"from-image"});}catch(e){bmp=await createImageBitmap(blob);}
+        if((bmp.width>bmp.height)===(sw>sh)&&bmp.width*bmp.height>sw*sh){src=bmp;sw=bmp.width;sh=bmp.height;}
+      }catch(e){}
+    }
+    const out=await processImage(src,sw,sh,false);
+    addShot(out);
+    toast("撮影しました");
+  }catch(e){toast("撮影に失敗："+e.message);}
+  S.busy=false;$("shutter").classList.remove("busy");
+}
+
+function fname(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `UTSUSHI_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${Math.floor(Math.random()*90+10)}.jpg`;}
+function addShot(blob){
+  const url=URL.createObjectURL(blob);
+  S.shots.push({blob,url,name:fname(),look:LOOKS[S.look].name});
+  $("thumb").style.backgroundImage=`url(${url})`;
+}
+
+// ===== Viewer =====
+function openViewer(i){if(!S.shots.length)return;S.vi=i;showShot();$("viewer").classList.add("on");}
+function showShot(){const s=S.shots[S.vi];$("vimg").src=s.url;$("vinfo").textContent=`${S.vi+1} / ${S.shots.length}　${s.look}`;}
+$("vprev").onclick=()=>{if(S.vi>0){S.vi--;showShot();}};
+$("vnext").onclick=()=>{if(S.vi<S.shots.length-1){S.vi++;showShot();}};
+$("vclose").onclick=()=>$("viewer").classList.remove("on");
+$("vshare").onclick=async()=>{
+  const s=S.shots[S.vi];const file=new File([s.blob],s.name,{type:"image/jpeg"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file]});}catch(e){}
+  }else download(s);
+};
+$("vdl").onclick=()=>download(S.shots[S.vi]);
+function download(s){const a=document.createElement("a");a.href=s.url;a.download=s.name;document.body.appendChild(a);a.click();a.remove();toast("ダウンロードしました");}
+
+// ===== Import =====
+$("importBtn").onclick=()=>$("file").click();
+$("file").onchange=async e=>{
+  const files=[...e.target.files];e.target.value="";
+  for(const f of files){
+    try{
+      let bmp;try{bmp=await createImageBitmap(f,{imageOrientation:"from-image"});}catch(er){bmp=await createImageBitmap(f);}
+      addShot(await processImage(bmp,bmp.width,bmp.height,false));
+    }catch(er){toast("読込に失敗："+er.message);}
+  }
+  if(files.length) openViewer(S.shots.length-1);
+};
+
+// ===== UI =====
+function toast(t){const e=$("toast");e.textContent=t;e.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.opacity=0,1600);}
+function renderLooks(){
+  const box=$("looks");box.innerHTML="";
+  LOOKS.forEach((l,i)=>{const b=document.createElement("button");b.className="chip"+(i===S.look?" on":"");b.textContent=l.name;
+    b.onclick=()=>{S.look=i;persist();renderLooks();};box.appendChild(b);});
+}
+function renderToggles(){
+  $("aspectBtn").textContent=ASPECTS[S.aspect].label;
+  $("gridBtn").classList.toggle("on",S.grid);$("grid").classList.toggle("on",S.grid);
+  $("frameBtn").classList.toggle("on",S.frame);
+  $("ev").value=S.ev;$("evv").textContent=(S.ev>0?"+":S.ev<0?"":"±")+Number(S.ev).toFixed(1);
+}
+$("aspectBtn").onclick=()=>{S.aspect=(S.aspect+1)%ASPECTS.length;persist();renderToggles();layout();};
+$("gridBtn").onclick=()=>{S.grid=!S.grid;persist();renderToggles();};
+$("frameBtn").onclick=()=>{S.frame=!S.frame;persist();renderToggles();toast(S.frame?"白フチ：ON":"白フチ：OFF");};
+$("ev").oninput=e=>{S.ev=parseFloat(e.target.value);persist();renderToggles();};
+$("ev").ondblclick=()=>{S.ev=0;persist();renderToggles();};
+$("shutter").onclick=capture;
+$("thumb").onclick=()=>openViewer(S.shots.length-1);
+$("flip").onclick=()=>{S.facing=S.facing==="environment"?"user":"environment";persist();startCamera();};
+document.addEventListener("keydown",e=>{if((e.key===" "||e.key==="AudioVolumeUp"||e.key==="AudioVolumeDown")&&!$("viewer").classList.contains("on")){e.preventDefault();capture();}});
+window.addEventListener("resize",()=>setTimeout(layout,100));
+video.addEventListener("loadedmetadata",layout);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopCamera();else startCamera();});
+
+renderLooks();renderToggles();
+if(R){startCamera();requestAnimationFrame(loop);}
+</script>
+</body>
+</html>
