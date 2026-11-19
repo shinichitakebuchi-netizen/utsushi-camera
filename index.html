@@ -48,31 +48,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
     linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c)),linear-gradient(var(--c),var(--c));
   background-position:left 9px top 9px,left 9px top 9px,right 9px top 9px,right 9px top 9px,left 9px bottom 9px,left 9px bottom 9px,right 9px bottom 9px,right 9px bottom 9px;
   background-size:16px 1.5px,1.5px 16px,16px 1.5px,1.5px 16px,16px 1.5px,1.5px 16px,16px 1.5px,1.5px 16px}
-#vfbar{position:absolute;top:16px;right:34px;display:flex;gap:9px;align-items:baseline;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+#vfbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:baseline;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
   color:var(--acc);text-shadow:0 0 6px rgba(255,122,26,.55),0 1px 2px #000;white-space:nowrap}
 #vfbar b{font-weight:600;color:#fff;text-shadow:0 1px 3px #000}
-/* 測光メーター */
-.meter{position:absolute;top:20px;left:20px;width:178px;padding:9px 11px 9px;border-radius:10px;background:rgba(12,12,12,.6);
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.09);font-size:9.5px;color:var(--dim);
+/* 測光メーター（被写体が見えるよう小さく・薄く） */
+.meter{position:absolute;top:34px;left:12px;width:146px;padding:6px 8px 7px;border-radius:8px;background:rgba(8,8,8,.42);
+  border:1px solid rgba(255,255,255,.08);font-size:8.5px;color:var(--dim);text-shadow:0 1px 2px rgba(0,0,0,.6);
   display:none;pointer-events:none;z-index:3}
 .meter.on{display:block}
-.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.mh span{font-family:var(--serif);font-size:11px;color:var(--fg);letter-spacing:.24em}
-.mh em{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--acc);border:1px solid rgba(255,122,26,.45);border-radius:4px;padding:1px 5px;letter-spacing:.04em}
+.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.mh span{font-family:var(--serif);font-size:9.5px;color:var(--fg);letter-spacing:.2em}
+.mh em{font-style:normal;font-family:var(--mono);font-size:8px;color:var(--acc);border:1px solid rgba(255,122,26,.5);border-radius:3px;padding:0 4px;letter-spacing:.02em}
 .mh em.off{color:var(--dim);border-color:#3a3a3a}
-.hist{display:block;width:156px;height:42px;border-bottom:1px solid rgba(255,255,255,.18)}
-.mv{display:flex;margin-top:6px}
-.mv div{display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
-.mv b{font-family:var(--mono);font-size:13px;color:var(--fg);font-weight:500}
-.mv small{font-size:8.5px;color:var(--mute);letter-spacing:.12em}
-.mc{display:flex;justify-content:space-between;margin-top:5px;font-size:9px;letter-spacing:.04em}
-.mc b{font-family:var(--mono);font-weight:500;color:var(--fg);margin-left:3px}
+.hist{display:block;width:100%;height:26px;border-bottom:1px solid rgba(255,255,255,.2)}
+.mv{display:flex;margin-top:4px}
+.mv div{display:flex;align-items:baseline;justify-content:center;gap:2px;flex:1}
+.mv b{font-family:var(--mono);font-size:11px;color:var(--fg);font-weight:500}
+.mv small{order:-1;font-size:7.5px;color:var(--dim);letter-spacing:.04em}
+.mc{display:flex;justify-content:space-between;margin-top:3px;font-size:8px}
+.mc b{font-family:var(--mono);font-weight:500;color:var(--fg);margin-left:2px}
 .mc b.hot{color:var(--acc)}.mc b.cold{color:var(--blue)}
-.mr{display:flex;align-items:center;gap:7px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--mono);font-size:9.5px;color:var(--fg);white-space:nowrap}
-.mr small{width:18px;flex:none;font-size:8.5px;color:var(--mute);letter-spacing:.06em}
+.mr{display:flex;align-items:center;gap:5px;margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,.08);font-family:var(--mono);font-size:8.5px;color:var(--fg);white-space:nowrap}
+.mr small{width:14px;flex:none;font-size:7.5px;color:var(--dim)}
 .mr .d{color:var(--dim)}
-.wbbar{position:relative;width:50px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--blue),#4a4a4a,var(--acc));flex:none}
-.wbbar i{position:absolute;top:50%;left:50%;width:7px;height:7px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(0,0,0,.6);transition:left .3s}
+.wbbar{position:relative;width:34px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--blue),#4a4a4a,var(--acc));flex:none}
+.wbbar i{position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 0 0 1.5px rgba(0,0,0,.6);transition:left .3s}
 #flash{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .18s}
 #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:13px;line-height:1.8;color:var(--dim)}
 #msg button{margin-top:14px;background:var(--acc);color:#000;border:none;border-radius:20px;padding:10px 22px;font-weight:600}
@@ -133,6 +133,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 #thumb,#flip,#shutter{transition:transform .3s}
 body[data-rot="90"] #thumb,body[data-rot="90"] #flip{transform:rotate(90deg)}
 body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
+#spacer,#shade{display:none}
+/* 縦画面：ファインダーを全面にして、操作部は上に重ねる */
+@media not all and (orientation:landscape) and (min-aspect-ratio:5/4){
+  #stage{position:absolute;inset:0;z-index:0;display:block}
+  #view{position:absolute}
+  #app>*:not(#stage){position:relative;z-index:1}
+  #app>#shade{display:block;position:absolute;left:0;right:0;bottom:0;z-index:0;pointer-events:none;
+    background:linear-gradient(rgba(11,11,11,0),rgba(11,11,11,.72) 36px,rgba(11,11,11,.9))}
+  #spacer{display:block;flex:1;min-height:0;pointer-events:none}
+  header{border-bottom:none;flex-wrap:nowrap;background:linear-gradient(rgba(11,11,11,.9),rgba(11,11,11,.55));padding:8px 0 8px 14px}
+  .brand span{display:none}
+  .hbtns{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;min-width:0;scrollbar-width:none;padding-right:14px;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 10px,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,transparent,#000 10px,#000 calc(100% - 18px),transparent)}
+  .hbtns::-webkit-scrollbar{display:none}
+  .pill{flex:none}
+  .looks{-webkit-mask-image:none;mask-image:none}
+}
 @media (orientation:landscape) and (min-aspect-ratio:5/4){
   #app{display:grid;grid-template-columns:1fr minmax(260px,32%);grid-template-rows:auto auto auto auto auto 1fr;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -167,7 +184,7 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
 <body>
 <div id="app">
   <header>
-    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v12</small></div>
+    <div class="brand"><b>写</b><i></i><span>UTSUSHI</span><small>v13</small></div>
     <div class="hbtns">
       <button class="pill tg" id="autoBtn">AUTO</button>
       <button class="pill tg" id="meterBtn">METER</button>
@@ -188,6 +205,8 @@ body[data-rot="-90"] #thumb,body[data-rot="-90"] #flip{transform:rotate(-90deg)}
     <div id="zoom"></div>
     <div id="msg">カメラを起動中…</div>
   </div>
+  <div id="spacer"></div>
+  <div id="shade"></div>
   <div class="looks" id="looks"></div>
   <div id="tip"></div>
   <div class="row">EV <div class="rwrap"><div class="ruler" id="evr"></div><b class="needle"></b></div><span class="v" id="evv">±0.0</span></div>
@@ -459,7 +478,7 @@ function makeMeter(el){
   const q=k=>el.querySelector(`[data-k="${k}"]`),cv=el.querySelector("canvas"),cx=cv.getContext("2d");
   const pc=v=>(v*100<1&&v>0?"<1":Math.round(v*100))+"%";
   return{el,update(st,a){
-    const dpr=Math.min(window.devicePixelRatio||1,2),W=156*dpr,H=42*dpr;
+    const dpr=Math.min(window.devicePixelRatio||1,2),W=Math.round((cv.clientWidth||130)*dpr),H=Math.round((cv.clientHeight||26)*dpr);
     if(cv.width!==W){cv.width=W;cv.height=H;}
     cx.clearRect(0,0,W,H);
     const bw=W/48;
@@ -506,16 +525,26 @@ function cropFor(sw,sh){
 }
 function targetAspect(sw,sh){let A=ASPECTS[S.aspect].v;if(!A)return sw/sh;return sh>sw?1/A:A;}
 
+const LAND=matchMedia("(orientation:landscape) and (min-aspect-ratio:5/4)");
 function layout(){
   const vw=video.videoWidth||1280,vh=video.videoHeight||720;
   const A=targetAspect(vw,vh);
-  const r=stage.getBoundingClientRect();
-  let w,h; if(r.width/r.height>A){h=r.height;w=h*A;}else{w=r.width;h=w/A;}
+  const r=stage.getBoundingClientRect(),land=LAND.matches;
+  // 縦画面は全面表示：ヘッダーのすぐ下から、横幅いっぱいに出す（下の操作部には半透明で重なる）
+  let top0=0,bot=r.height;
+  if(!land){top0=document.querySelector("header").getBoundingClientRect().bottom-r.top;bot=$("looks").getBoundingClientRect().top-r.top;}
+  const avH=r.height-top0;
+  let w,h; if(r.width/avH>A){h=avH;w=h*A;}else{w=r.width;h=w/A;}
+  const left=(r.width-w)/2,top=land?(r.height-h)/2:top0+Math.max(0,(bot-top0-h)/2);
   const dpr=Math.min(window.devicePixelRatio||1,2);
   view.style.width=w+"px";view.style.height=h+"px";
+  view.style.left=land?"":left+"px";view.style.top=land?"":top+"px";
   view.width=Math.round(w*dpr);view.height=Math.round(h*dpr);
   ["grid","vf"].forEach(id=>{const g=$(id);g.style.width=w+"px";g.style.height=h+"px";
-    g.style.left=(r.width-w)/2+"px";g.style.top=(r.height-h)/2+"px";});
+    g.style.left=left+"px";g.style.top=top+"px";});
+  const z=$("zoom");
+  if(land){z.style.top="";z.style.bottom="";}else{z.style.top=(Math.min(top+h,bot)-58)+"px";z.style.bottom="auto";}
+  if(!land)$("shade").style.top=(bot-36)+"px";
 }
 
 let fr=0;
