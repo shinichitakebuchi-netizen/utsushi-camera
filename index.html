@@ -138,6 +138,8 @@ uniform sampler2D u_tex,u_lut;
 uniform vec4 u_crop;
 uniform float u_look,u_nlooks,u_exp,u_grain,u_vig,u_seed,u_mirror,u_gsize,u_clar;
 uniform vec3 u_wb;
+uniform vec2 u_px;
+uniform float u_nr;
 uniform vec2 u_res;
 const float N=17.;
 float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
@@ -153,6 +155,17 @@ void main(){
   vec2 uv=v_uv; if(u_mirror>.5) uv.x=1.-uv.x;
   vec2 tuv=u_crop.xy+uv*u_crop.zw;
   vec3 c=texture2D(u_tex,tuv).rgb;
+  // ノイズ低減：平らな所だけ周囲となじませる（輪郭は残す）
+  if(u_nr>0.){
+    vec3 s1=texture2D(u_tex,tuv+vec2(u_px.x,0.)).rgb,s2=texture2D(u_tex,tuv-vec2(u_px.x,0.)).rgb;
+    vec3 s3=texture2D(u_tex,tuv+vec2(0.,u_px.y)).rgb,s4=texture2D(u_tex,tuv-vec2(0.,u_px.y)).rgb;
+    vec3 s5=texture2D(u_tex,tuv+u_px).rgb,s6=texture2D(u_tex,tuv-u_px).rgb;
+    vec3 s7=texture2D(u_tex,tuv+vec2(u_px.x,-u_px.y)).rgb,s8=texture2D(u_tex,tuv+vec2(-u_px.x,u_px.y)).rgb;
+    vec3 nb=(s1+s2+s3+s4+s5+s6+s7+s8)*.125;
+    float ed=max(max(length(s1-s2),length(s3-s4)),max(length(s5-s6),length(s7-s8)));
+    float fl=1.-smoothstep(.04,.12,ed);
+    c=mix(c,nb,u_nr*fl);
+  }
   // 立体感（ローカルコントラスト）：周囲の平均との差を少し強調
   if(u_clar>0.){
     float ar0=u_res.x/u_res.y;
@@ -164,7 +177,7 @@ void main(){
       bl+=texture2D(u_tex,tuv+vec2(cos(a),sin(a))*d*rr*(i<6?1.:1.)).rgb;
     }
     bl/=12.;
-    float dl=luma(c)-luma(bl);
+    float dl=clamp(luma(c)-luma(bl),-.05,.05);   // 強い輪郭は強調しない（白フチ防止）
     c+=dl*u_clar*(1.-smoothstep(.75,1.,luma(c)))*smoothstep(0.,.12,luma(c));
   }
   // ホワイトバランス＋露出（リニア空間）
@@ -200,7 +213,7 @@ class Renderer{
     [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR]]
       .forEach(([k,v])=>gl.texParameteri(gl.TEXTURE_2D,k,v));
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);this.tex=t;this.lutReady=false;
-    this.u={};["u_lut","u_nlooks","u_wb","u_clar","u_tex","u_crop","u_look","u_exp","u_grain","u_vig","u_seed","u_mirror","u_gsize","u_res"].forEach(n=>this.u[n]=gl.getUniformLocation(pr,n));
+    this.u={};["u_lut","u_nlooks","u_wb","u_clar","u_nr","u_px","u_tex","u_crop","u_look","u_exp","u_grain","u_vig","u_seed","u_mirror","u_gsize","u_res"].forEach(n=>this.u[n]=gl.getUniformLocation(pr,n));
     this.maxTex=gl.getParameter(gl.MAX_TEXTURE_SIZE);
   }
   setLut(img){const gl=this.gl;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.lt);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
@@ -209,7 +222,8 @@ class Renderer{
   draw(o){
     const gl=this.gl,u=this.u;gl.viewport(0,0,this.c.width,this.c.height);
     gl.uniform1i(u.u_tex,0);gl.uniform1i(u.u_lut,1);gl.uniform1f(u.u_nlooks,LOOKS.length);
-    const wb=o.wb||[1,1,1];gl.uniform3f(u.u_wb,wb[0],wb[1],wb[2]);gl.uniform1f(u.u_clar,o.clar||0);gl.uniform4f(u.u_crop,o.crop[0],o.crop[1],o.crop[2],o.crop[3]);
+    const wb=o.wb||[1,1,1];gl.uniform3f(u.u_wb,wb[0],wb[1],wb[2]);gl.uniform1f(u.u_clar,o.clar||0);
+    gl.uniform1f(u.u_nr,o.nr||0);const px=o.px||[0,0];gl.uniform2f(u.u_px,px[0],px[1]);gl.uniform4f(u.u_crop,o.crop[0],o.crop[1],o.crop[2],o.crop[3]);
     gl.uniform1f(u.u_look,o.look);gl.uniform1f(u.u_exp,o.exp);gl.uniform1f(u.u_grain,o.grain);gl.uniform1f(u.u_vig,o.vig);
     gl.uniform1f(u.u_seed,o.seed);gl.uniform1f(u.u_mirror,o.mirror?1:0);gl.uniform1f(u.u_gsize,o.gsize||1);
     gl.uniform2f(u.u_res,this.c.width,this.c.height);
@@ -234,7 +248,7 @@ function film(a){
   if(!S.film)return{grain:0,vig:0};
   const base=LOOKS[S.look].mono?{grain:.045,vig:.28}:{grain:.03,vig:.22};
   // 暗い場面（大きく持ち上げた時）は元のノイズが多いので粒子を控えめに
-  const g=a?Math.max(0,a.exp):0, k=Math.max(.3,1-.45*g);
+  const g=Math.max(0,(a?a.exp:0)+S.ev), k=Math.max(.15,1-.6*g);
   return{grain:base.grain*k,vig:base.vig};
 }
 // ===== おまかせ補正（ホワイトバランス・明るさ） =====
@@ -275,7 +289,12 @@ function updateAuto(){
   const t=AUTO.ready?.25:1;
   AUTO.wb=AUTO.wb.map((v,i)=>v+(a.wb[i]-v)*t);AUTO.exp+=(a.exp-AUTO.exp)*t;AUTO.ready=true;
 }
-function autoParams(a){return S.auto?{wb:a.wb,exp:a.exp+S.ev,clar:.35}:{wb:[1,1,1],exp:S.ev,clar:.2};}
+function autoParams(a){
+  const up=Math.max(0,(S.auto?a.exp:0)+S.ev);          // どれだけ明るく持ち上げたか
+  const clar=(S.auto?.3:.2)*Math.max(.25,1-.5*up);      // 暗い場面ほど立体感は控えめ
+  const nr=Math.min(.85,.25+.4*up);                      // 暗い場面ほどノイズ低減を強く
+  return S.auto?{wb:a.wb,exp:a.exp+S.ev,clar,nr}:{wb:[1,1,1],exp:S.ev,clar,nr};
+}
 // LUT画像を読み込み
 const lutImg=new Image();
 lutImg.onload=()=>{if(R)R.setLut(lutImg);if(EX)EX.setLut(lutImg);};
@@ -309,7 +328,7 @@ function loop(){
   if(!R.lutReady) return;
   if(S.auto) updateAuto();
   const A=autoParams(AUTO),F=film(S.auto?AUTO:null);
-  R.draw({crop:cropFor(video.videoWidth,video.videoHeight),look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,grain:F.grain,vig:F.vig,seed:(fr++%60)*1.37,mirror:S.facing==="user",gsize:1});
+  R.draw({crop:cropFor(video.videoWidth,video.videoHeight),look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[1/video.videoWidth,1/video.videoHeight],grain:F.grain,vig:F.vig,seed:(fr++%60)*1.37,mirror:S.facing==="user",gsize:1});
 }
 
 // ===== Camera =====
@@ -369,7 +388,7 @@ async function processImage(src,sw,sh,mirror,auto){
   EX.upload(s);
   const a=auto||analyze(s,sw,sh);
   const L=LOOKS[S.look],A=autoParams(a),F=film(S.auto?a:null);
-  EX.draw({crop,look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,grain:F.grain,vig:F.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
+  EX.draw({crop,look:S.look,exp:A.exp,wb:A.wb,clar:A.clar,nr:A.nr,px:[1/sw,1/sh],grain:F.grain,vig:F.vig,seed:Math.random()*100,mirror,gsize:Math.max(1,Math.max(EX.c.width,EX.c.height)/1800)});
   let out=EX.c;
   if(S.frame) out=addFrame(EX.c,L.name);
   const blob=await new Promise(res=>out.toBlob(res,"image/jpeg",0.93));
