@@ -28,6 +28,11 @@ val ASPECTS = listOf(
     Aspect("3:2", 3f / 2f), Aspect("元の比率", 0f), Aspect("1:1", 1f), Aspect("16:9", 16f / 9f), Aspect("4:3", 4f / 3f)
 )
 
+data class Res(val label: String, val mp: Int)
+
+/** 保存サイズ（mp=0は最大） */
+val RESS = listOf(Res("MAX", 0), Res("12MP", 12), Res("8MP", 8), Res("4MP", 4), Res("2MP", 2))
+
 /** 画像（幅sw×高さsh）に対する切り抜き範囲 [x, y, w, h]（0〜1） */
 fun cropFor(aspectIdx: Int, sw: Float, sh: Float): FloatArray {
     var a = ASPECTS[aspectIdx].v

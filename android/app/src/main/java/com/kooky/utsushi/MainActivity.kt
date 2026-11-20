@@ -61,8 +61,23 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
     private lateinit var meter: MeterView
     private lateinit var top: LinearLayout
     private lateinit var bottom: LinearLayout
-    private lateinit var looksScroll: HorizontalScrollView
-    private lateinit var looksRow: LinearLayout
+    private lateinit var looksScroll: LooksDial
+    private lateinit var editor: Editor
+    private lateinit var sensors: android.hardware.SensorManager
+    private val pickImage = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) editor.open(uri)
+    }
+    private val levelListener = object : android.hardware.SensorEventListener {
+        private var sx = 0f; private var sy = 0f; private var sz = 0f
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            sx += (e.values[0] - sx) * .2f; sy += (e.values[1] - sy) * .2f; sz += (e.values[2] - sz) * .2f
+            val g = Math.sqrt((sx * sx + sy * sy + sz * sz).toDouble()).toFloat()
+            // 画面を上／下に向けているときは出さない
+            val ang = if (g > 1f && kotlin.math.abs(sz) < g * .8f) Math.toDegrees(Math.atan2(-sx.toDouble(), sy.toDouble())).toFloat() else null
+            if (s.level) { finder.levelAngle = ang; finder.invalidate() }
+        }
+        override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+    }
     private lateinit var tip: TextView
     private lateinit var evRuler: RulerView
     private lateinit var evVal: TextView
@@ -120,6 +135,12 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), 1)
         }
+        sensors = getSystemService(SENSOR_SERVICE) as android.hardware.SensorManager
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (editor.isOpen) editor.close() else { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
+            }
+        })
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
@@ -136,11 +157,14 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
         super.onResume()
         glView.onResume()
         if (orientation.canDetectOrientation()) orientation.enable()
+        val gs = sensors.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) ?: sensors.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+        if (gs != null) sensors.registerListener(levelListener, gs, android.hardware.SensorManager.SENSOR_DELAY_UI)
     }
 
     override fun onPause() {
         super.onPause()
         orientation.disable()
+        sensors.unregisterListener(levelListener)
         provider?.unbindAll()
         camera = null
         glView.onPause()
@@ -152,7 +176,7 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) && !editor.isOpen) {
             if (event?.repeatCount == 0) capture()
             return true
         }
@@ -449,9 +473,14 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
         addPill("meter", "METER", true) { s.meter = !s.meter; s.save(); renderToggles() }
         addPill("af", "AF-C", false) { cycleAf() }
         addPill("aspect", "3:2", false) { s.aspect = (s.aspect + 1) % ASPECTS.size; s.save(); renderToggles(); layoutImage() }
+        addPill("res", "MAX", false) { s.res = (s.res + 1) % RESS.size; s.save(); renderToggles(); toast("保存サイズ：" + RESS[s.res].label + if (s.res == 0) "（カメラの最大）" else "") }
         addPill("grid", "GRID", true) { s.grid = !s.grid; s.save(); renderToggles() }
         addPill("film", "FILM", true) { s.film = !s.film; s.save(); renderToggles(); toast(if (s.film) "粒子・周辺減光：ON" else "粒子・周辺減光：OFF") }
         addPill("frame", "FRAME", true) { s.frame = !s.frame; s.save(); renderToggles(); toast(if (s.frame) "白フチ：ON" else "白フチ：OFF") }
+        addPill("level", "LEVEL", true) { s.level = !s.level; s.save(); if (!s.level) finder.levelAngle = null; renderToggles(); toast(if (s.level) "水平器：ON（線がオレンジになれば水平）" else "水平器：OFF") }
+        addPill("import", "読込", false) {
+            pickImage.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
         root.addView(top, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
 
         // --- 下部：色味・ヒント・EV・MF・シャッター ---
@@ -461,14 +490,7 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
                 intArrayOf(Color.argb(0, 11, 11, 11), Color.argb(190, 11, 11, 11), Color.argb(235, 11, 11, 11)))
             setPadding(0, dp(28f).toInt(), 0, dp(14f).toInt())
         }
-        looksScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; isHorizontalFadingEdgeEnabled = true; setFadingEdgeLength(dp(60f).toInt()) }
-        looksRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        looksScroll.addView(looksRow)
-        LOOKS.forEachIndexed { i, l ->
-            val c = LookChip(this, l.name)
-            c.setOnClickListener { selectLook(i) }
-            looksRow.addView(c)
-        }
+        looksScroll = LooksDial(this) { selectLook(it) }
         bottom.addView(looksScroll)
         val line = View(this).apply { setBackgroundColor(Color.rgb(0x26, 0x26, 0x26)) }
         bottom.addView(line, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1f).toInt()))
@@ -540,6 +562,10 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
             bottomMargin = dp(250f).toInt()
         })
 
+        editor = Editor(this, s, processor, procHandler, { toast(it) }, { runOnUiThread { renderToggles(); selectLook(s.look, false) } })
+        root.addView(editor.view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        toastView.bringToFront()
+
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutImage() }
         renderToggles()
         selectLook(s.look, false)
@@ -547,14 +573,8 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
 
     private fun selectLook(i: Int, notify: Boolean = true) {
         s.look = i; s.save()
-        for (k in 0 until looksRow.childCount) (looksRow.getChildAt(k) as LookChip).selectedLook = k == i
+        looksScroll.select(i)
         tip.text = LOOKS[i].tip
-        looksRow.post {
-            val c = looksRow.getChildAt(i)
-            val pad = looksScroll.width / 2
-            if (looksRow.paddingLeft != pad) looksRow.setPadding(pad - dp(40f).toInt(), 0, pad - dp(40f).toInt(), 0)
-            looksScroll.smoothScrollTo(c.left + c.width / 2 - looksScroll.width / 2, 0)
-        }
         if (notify) finder.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
         updateInfo()
     }
@@ -582,6 +602,8 @@ class MainActivity : ComponentActivity(), PreviewRenderer.Callbacks {
         pills["film"]?.on = s.film
         pills["frame"]?.on = s.frame
         pills["aspect"]?.text = ASPECTS[s.aspect].label
+        pills["res"]?.text = RESS[s.res].label
+        pills["level"]?.on = s.level
         pills["af"]?.text = s.af
         meter.visibility = if (s.meter) View.VISIBLE else View.GONE
         finder.grid = s.grid

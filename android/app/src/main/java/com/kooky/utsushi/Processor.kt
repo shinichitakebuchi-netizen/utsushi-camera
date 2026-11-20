@@ -67,6 +67,21 @@ class Processor(private val ctx: Context) {
         bmp?.recycle()
     }
 
+    /** 端末内の写真を読み込む（向きは自動で補正） */
+    fun decodeUri(uri: Uri): Bitmap {
+        val src = android.graphics.ImageDecoder.createSource(ctx.contentResolver, uri)
+        var b = android.graphics.ImageDecoder.decodeBitmap(src) { dec, info, _ ->
+            dec.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+            var ss = 1
+            while (info.size.width.toLong() * info.size.height / (ss * ss) > 26_000_000L) ss *= 2
+            if (ss > 1) dec.setTargetSampleSize(ss)
+        }
+        if (b.config != Bitmap.Config.ARGB_8888) {
+            val c = b.copy(Bitmap.Config.ARGB_8888, false); b.recycle(); b = c
+        }
+        return b
+    }
+
     /** JPEGを読み込み、回転を直し、大きすぎる場合は縮小 */
     fun decode(jpeg: ByteArray, rotation: Int): Bitmap {
         val bo = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -84,14 +99,28 @@ class Processor(private val ctx: Context) {
     }
 
     /** 色味をかけた完成画像を返す（GLは呼び出しスレッドで使う＝常に同じスレッドから呼ぶこと） */
-    fun process(src0: Bitmap, s: Settings, a: AutoResult?, mirror: Boolean): Bitmap {
+    /**
+     * maxSide>0：編集画面のプレビュー用に、長辺をこの大きさまで縮めて処理。
+     * maxSide=0：保存用。解像度設定（RES）に合わせて縮める。
+     */
+    fun process(src0: Bitmap, s: Settings, a: AutoResult?, mirror: Boolean, maxSide: Int = 0): Bitmap {
         ensureGl()
         val p = prog!!
         var src = src0
-        if (max(src.width, src.height) > maxTex) {
-            val k = maxTex.toFloat() / max(src.width, src.height)
-            val sc = Bitmap.createScaledBitmap(src, (src.width * k).roundToInt(), (src.height * k).roundToInt(), true)
-            src = sc
+        val long = max(src.width, src.height).toFloat()
+        var k = 1f
+        if (maxSide > 0) k = min(1f, maxSide / long)
+        else {
+            val mp = RESS[s.res].mp
+            if (mp > 0) {
+                val c0 = cropFor(s.aspect, src.width.toFloat(), src.height.toFloat())
+                val area = src.width.toDouble() * src.height * c0[2] * c0[3]
+                if (area > mp * 1e6) k = Math.sqrt(mp * 1e6 / area).toFloat()
+            }
+        }
+        k = min(k, maxTex / long)
+        if (k < .999f) {
+            src = Bitmap.createScaledBitmap(src, max(1, (src.width * k).roundToInt()), max(1, (src.height * k).roundToInt()), true)
         }
         val sw = src.width; val sh = src.height
         val crop = cropFor(s.aspect, sw.toFloat(), sh.toFloat())

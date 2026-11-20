@@ -14,6 +14,8 @@ class Settings(ctx: Context) {
     @Volatile var look = sp.getInt("look", 0).coerceIn(0, LOOKS.size - 1)
     @Volatile var ev = sp.getFloat("ev", 0f).coerceIn(-1.5f, 1.5f)
     @Volatile var aspect = sp.getInt("aspect", 0).coerceIn(0, ASPECTS.size - 1)
+    @Volatile var res = sp.getInt("res", 0).coerceIn(0, RESS.size - 1)
+    @Volatile var level = sp.getBoolean("level", true)
     @Volatile var back = sp.getBoolean("back", true)
     @Volatile var af = sp.getString("af", "AF-C") ?: "AF-C"
     @Volatile var mfk = sp.getInt("mfk", MF_N).coerceIn(0, MF_N)
@@ -22,7 +24,7 @@ class Settings(ctx: Context) {
         sp.edit()
             .putBoolean("auto", auto).putBoolean("meter", meter).putBoolean("film", film)
             .putBoolean("grid", grid).putBoolean("frame", frame).putInt("look", look)
-            .putFloat("ev", ev).putInt("aspect", aspect).putBoolean("back", back)
+            .putFloat("ev", ev).putInt("aspect", aspect).putInt("res", res).putBoolean("level", level).putBoolean("back", back)
             .putString("af", af).putInt("mfk", mfk)
             .apply()
     }

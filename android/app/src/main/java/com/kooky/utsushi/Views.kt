@@ -265,9 +265,38 @@ class LookChip(ctx: Context, label: String) : TextView(ctx) {
     }
 }
 
+// ===== 色味ダイヤル（横スクロール。選んだ色味が真ん中に来る） =====
+class LooksDial(ctx: Context, private val onSelect: (Int) -> Unit) : android.widget.HorizontalScrollView(ctx) {
+    private val row = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+
+    init {
+        isHorizontalScrollBarEnabled = false
+        isHorizontalFadingEdgeEnabled = true
+        setFadingEdgeLength(dp(60f).toInt())
+        addView(row)
+        LOOKS.forEachIndexed { i, l ->
+            val c = LookChip(ctx, l.name)
+            c.setOnClickListener { onSelect(i) }
+            row.addView(c)
+        }
+    }
+
+    fun select(i: Int) {
+        for (k in 0 until row.childCount) (row.getChildAt(k) as LookChip).selectedLook = k == i
+        post {
+            val c = row.getChildAt(i) ?: return@post
+            val pad = width / 2 - dp(40f).toInt()
+            if (row.paddingLeft != pad && pad > 0) row.setPadding(pad, 0, pad, 0)
+            row.post { smoothScrollTo(c.left + c.width / 2 - width / 2, 0) }
+        }
+    }
+}
+
 // ===== ファインダー（四隅のカギ・グリッド・情報表示・ピント枠） =====
 class FinderOverlay(ctx: Context) : View(ctx) {
     var grid = true
+    /** 水平器：端末の傾き（度、時計回りが正）。nullなら非表示 */
+    var levelAngle: Float? = null
     var info = ""
     var infoBold = ""
     private var afX = 0f
@@ -296,6 +325,24 @@ class FinderOverlay(ctx: Context) : View(ctx) {
                 canvas.drawLine(w * k / 3, 0f, w * k / 3, h, pt)
                 canvas.drawLine(0f, h * k / 3, w, h * k / 3, pt)
             }
+        }
+        // 水平器：線が水平（オレンジ）になるように構える
+        levelAngle?.let { ang ->
+            val base = Math.round(ang / 90f) * 90f
+            val d = ang - base
+            val ok = abs(d) < 1f
+            val cx = w / 2; val cy = h / 2; val half = dp(60f)
+            canvas.save(); canvas.rotate(-base, cx, cy)
+            pt.color = Color.argb(150, 255, 255, 255); pt.strokeWidth = dp(1.5f)
+            canvas.drawLine(cx - half - dp(16f), cy, cx - half - dp(4f), cy, pt)
+            canvas.drawLine(cx + half + dp(4f), cy, cx + half + dp(16f), cy, pt)
+            canvas.restore()
+            canvas.save(); canvas.rotate(-ang, cx, cy)
+            pt.color = if (ok) C.ACC else Color.argb(200, 255, 255, 255); pt.strokeWidth = dp(2f)
+            if (ok) pt.setShadowLayer(dp(4f), 0f, 0f, C.ACC) else pt.setShadowLayer(dp(2f), 0f, 0f, Color.argb(160, 0, 0, 0))
+            canvas.drawLine(cx - half, cy, cx + half, cy, pt)
+            pt.clearShadowLayer()
+            canvas.restore()
         }
         // 四隅
         pt.color = Color.argb(190, 255, 255, 255); pt.strokeWidth = dp(1.5f)
